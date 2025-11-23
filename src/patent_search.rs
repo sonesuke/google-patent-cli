@@ -103,6 +103,52 @@ impl PatentSearcher {
                         id: el.id,
                         text: el.innerText.trim()
                     }));
+
+                    // Fallback for unstructured description (e.g., Japanese patents)
+                    if (descParas.length === 0) {
+                        // Look for "Description" heading
+                        const headings = Array.from(document.querySelectorAll("h2, h3, h4, b, strong"));
+                        let foundHeading = null;
+                        for (const h of headings) {
+                            if (h.innerText.trim() === "Description") {
+                                foundHeading = h;
+                                break;
+                            }
+                        }
+
+                        if (foundHeading) {
+                            let textContent = "";
+                            let sibling = foundHeading.nextSibling;
+                            
+                            while (sibling) {
+                                if (sibling.nodeType === 3) { // TEXT_NODE
+                                    if (sibling.textContent && sibling.textContent.trim() !== "") {
+                                        textContent += sibling.textContent.trim() + "\n";
+                                    }
+                                } else if (sibling.nodeType === 1) { // ELEMENT_NODE
+                                    const tag = sibling.tagName.toUpperCase();
+                                    // Stop at next section heading
+                                    if (tag === "H2" || tag === "H3" || tag === "H4" || (tag === "SECTION" && sibling.innerText.includes("Claims"))) {
+                                        break; 
+                                    }
+                                    // Check if it's the Claims heading
+                                    if (sibling.innerText.trim() === "Claims") {
+                                        break;
+                                    }
+                                    textContent += sibling.innerText.trim() + "\n";
+                                }
+                                sibling = sibling.nextSibling;
+                            }
+
+                            if (textContent.trim() !== "") {
+                                descParas.push({
+                                    number: "00001",
+                                    id: "DESC-FULL",
+                                    text: textContent
+                                });
+                            }
+                        }
+                    }
                     
                     // Extract claims with numbers
                     const claimsArray = Array.from(document.querySelectorAll('div.claim[num]')).map(el => ({
