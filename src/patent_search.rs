@@ -44,16 +44,16 @@ impl PatentSearcher {
     }
 
 
-    #[allow(clippy::option_if_let_else)]
     async fn search_internal(&self, options: &SearchOptions) -> Result<Vec<Patent>> {
         let page_ws_url = self.browser.new_page().await?;
         let page = CdpPage::new(&page_ws_url).await?;
 
-        let url = options.to_url()?;
-
-        page.goto(&url).await?;
+        let base_url = options.to_url()?;
 
         if let Some(patent_number) = &options.patent_number {
+            // Single patent lookup - no pagination needed
+            page.goto(&base_url).await?;
+            
             // Wait for meta description tag to ensure page is loaded
             let loaded = page.wait_for_element("meta[name='description']", 15).await?;
             if !loaded {
@@ -67,23 +67,61 @@ impl PatentSearcher {
                 .evaluate(include_str!("scripts/extract_patent.js"))
                 .await?;
 
-            parse_single_patent_result(result, patent_number, url)
+            parse_single_patent_result(result, patent_number, base_url)
         } else {
-
-            // Search results page - use JavaScript evaluation
+            // Search results page - may need pagination
+            let mut all_patents: Vec<Patent> = Vec::new();
+            let limit = options.limit.unwrap_or(10);
             
-            // Wait for results to load
-            // We wait for the PDF link class which is specific to results
-            let loaded = page.wait_for_element(".search-result-item", 15).await?;
-            if !loaded {
-                // If it times out, it might be because there are no results, or network issues.
+            // Calculate how many pages we need to fetch
+            // Google Patents shows 10 results per page
+            let pages_needed = limit.div_ceil(10);
+            
+            for page_num in 0..pages_needed {
+                // Construct URL with page parameter
+                // First page (page_num=0): no &page parameter
+                // Second page (page_num=1): &page=1
+                // Third page (page_num=2): &page=2, etc.
+                let page_url = if page_num == 0 {
+                    base_url.clone()
+                } else {
+                    format!("{}&page={}", base_url, page_num)
+                };
+                
+                page.goto(&page_url).await?;
+                
+                // Wait for results to load
+                let loaded = page.wait_for_element(".search-result-item", 15).await?;
+                if !loaded {
+                    // No results on this page, stop pagination
+                    break;
+                }
+
+                let results = page
+                    .evaluate(include_str!("scripts/extract_search_results.js"))
+                    .await?;
+
+                let page_patents: Vec<Patent> = serde_json::from_value(results)?;
+                
+                // If we got no results, stop pagination
+                if page_patents.is_empty() {
+                    break;
+                }
+                
+                all_patents.extend(page_patents);
+                
+                // If we've collected enough results, stop
+                if all_patents.len() >= limit {
+                    break;
+                }
             }
-
-            let results = page
-                .evaluate(include_str!("scripts/extract_search_results.js"))
-                .await?;
-
-            parse_search_results(results, options.limit)
+            
+            // Truncate to exact limit
+            if all_patents.len() > limit {
+                all_patents.truncate(limit);
+            }
+            
+            Ok(all_patents)
         }
     }
 }
@@ -96,7 +134,7 @@ fn parse_single_patent_result(result: serde_json::Value, patent_number: &str, ur
     let abstract_text = result["abstract"].as_str().map(String::from);
     
     // Parse description paragraphs
-    let description_paragraphs = if let Some(paras) = result["description_paragraphs"].as_array() {
+    let description_paragraphs = result["description_paragraphs"].as_array().and_then(|paras| {
         let parsed: Vec<crate::models::DescriptionParagraph> = paras
             .iter()
             .filter_map(|p| {
@@ -108,12 +146,10 @@ fn parse_single_patent_result(result: serde_json::Value, patent_number: &str, ur
             })
             .collect();
         if parsed.is_empty() { None } else { Some(parsed) }
-    } else {
-        None
-    };
+    });
     
     // Parse claims
-    let claims = if let Some(claims_arr) = result["claims"].as_array() {
+    let claims = result["claims"].as_array().and_then(|claims_arr| {
         let parsed: Vec<crate::models::Claim> = claims_arr
             .iter()
             .filter_map(|c| {
@@ -125,12 +161,10 @@ fn parse_single_patent_result(result: serde_json::Value, patent_number: &str, ur
             })
             .collect();
         if parsed.is_empty() { None } else { Some(parsed) }
-    } else {
-        None
-    };
+    });
     
     // Parse images
-    let images = if let Some(imgs) = result["images"].as_array() {
+    let images = result["images"].as_array().and_then(|imgs| {
         let parsed: Vec<crate::models::PatentImage> = imgs
             .iter()
             .filter_map(|img| {
@@ -141,9 +175,7 @@ fn parse_single_patent_result(result: serde_json::Value, patent_number: &str, ur
             })
             .collect();
         if parsed.is_empty() { None } else { Some(parsed) }
-    } else {
-        None
-    };
+    });
     
     let filing_date = result["filing_date"].as_str().map(String::from);
 
@@ -161,6 +193,7 @@ fn parse_single_patent_result(result: serde_json::Value, patent_number: &str, ur
     }])
 }
 
+#[cfg(test)]
 fn parse_search_results(results: serde_json::Value, limit: Option<usize>) -> Result<Vec<Patent>> {
     let mut patents: Vec<Patent> = serde_json::from_value(results)?;
     
@@ -174,6 +207,7 @@ fn parse_search_results(results: serde_json::Value, limit: Option<usize>) -> Res
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use serde_json::json;
@@ -246,5 +280,110 @@ mod tests {
         let claims = p.claims.as_ref().unwrap();
         assert_eq!(claims.len(), 1);
         assert!(claims[0].text.starts_with("1. A non-transitory machine-readable storage medium"));
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod integration_tests {
+    use super::*;
+
+    // Helper to create a searcher
+    async fn create_searcher() -> PatentSearcher {
+        // Use headless mode for tests
+        PatentSearcher::new(true, false).await.expect("Failed to create PatentSearcher")
+    }
+
+    #[tokio::test]
+    async fn test_real_search_query() {
+        let searcher = create_searcher().await;
+        let options = SearchOptions {
+            query: Some("interactive big data analysis".to_string()),
+            patent_number: None,
+            limit: None,
+            ..Default::default()
+        };
+
+        let results = searcher.search(&options).await.expect("Search failed");
+        
+        assert!(!results.is_empty(), "Should return at least one result");
+        // Verify the first result has some expected content
+        let first = &results[0];
+        assert!(!first.title.is_empty(), "Title should not be empty");
+        assert!(first.url.contains("patents.google.com"), "URL should contain google patents domain");
+    }
+
+    #[tokio::test]
+    async fn test_real_patent_lookup() {
+        let searcher = create_searcher().await;
+        let patent_id = "US9152718B2";
+        let options = SearchOptions {
+            query: None,
+            patent_number: Some(patent_id.to_string()),
+            limit: None,
+            ..Default::default()
+        };
+
+        let results = searcher.search(&options).await.expect("Patent lookup failed");
+        
+        assert_eq!(results.len(), 1, "Should return exactly one patent");
+        let patent = &results[0];
+        assert_eq!(patent.id, patent_id, "Should return the requested patent ID");
+        assert!(!patent.title.is_empty(), "Title should not be empty");
+        assert!(patent.abstract_text.is_some(), "Should have abstract");
+        assert!(patent.claims.is_some(), "Should have claims");
+    }
+
+    #[tokio::test]
+    async fn test_real_search_limit() {
+        let searcher = create_searcher().await;
+        let limit = 2;
+        let options = SearchOptions {
+            query: Some("machine learning".to_string()),
+            patent_number: None,
+            limit: Some(limit),
+            ..Default::default()
+        };
+
+        let results = searcher.search(&options).await.expect("Search with limit failed");
+        
+        assert_eq!(results.len(), limit, "Should return exactly {} results", limit);
+    }
+
+    #[tokio::test]
+    async fn test_real_raw_html() {
+        let searcher = create_searcher().await;
+        let patent_id = "US9152718B2";
+        
+        let html = searcher.get_raw_html(patent_id).await.expect("Failed to get raw HTML");
+        
+        assert!(!html.is_empty(), "HTML should not be empty");
+        // Check for common HTML elements (DOCTYPE might be lowercase or missing)
+        assert!(html.to_lowercase().contains("<html") || html.contains("<HTML"), 
+                "Should contain HTML tag");
+        // Check for patent-related content
+        let html_lower = html.to_lowercase();
+        assert!(html_lower.contains("patent") || html_lower.contains("interactive"), 
+                "Should contain patent-related content");
+    }
+
+    #[tokio::test]
+    async fn test_real_search_pagination() {
+        let searcher = create_searcher().await;
+        let limit = 25;
+        let options = SearchOptions {
+            query: Some("machine learning".to_string()),
+            patent_number: None,
+            limit: Some(limit),
+            ..Default::default()
+        };
+
+        let results = searcher.search(&options).await.expect("Pagination search failed");
+        
+        assert_eq!(results.len(), limit, "Should return exactly {} results via pagination", limit);
+        
+        // Verify results are unique (no duplicates from pagination)
+        let ids: std::collections::HashSet<_> = results.iter().map(|p| &p.id).collect();
+        assert_eq!(ids.len(), results.len(), "All results should have unique IDs");
     }
 }

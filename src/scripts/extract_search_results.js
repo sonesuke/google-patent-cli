@@ -7,9 +7,39 @@
             const titleEl = item.querySelector(".result-title h3 raw-html span");
             const title = titleEl ? titleEl.innerText.trim() : "No Title";
 
-            // ID
+            // ID - try multiple methods
+            // Method 1: .pdfLink span (most common)
+            let id = null;
             const idEl = item.querySelector(".pdfLink span");
-            const id = idEl ? idEl.innerText.trim() : "Unknown";
+            if (idEl) {
+                id = idEl.innerText.trim();
+            }
+
+            // Method 2: Extract from result-title link href
+            if (!id || id === "") {
+                const titleLink = item.querySelector(".result-title a[href*='/patent/']");
+                if (titleLink) {
+                    const href = titleLink.getAttribute("href");
+                    const match = href.match(/\/patent\/([A-Z0-9]+)/);
+                    if (match) {
+                        id = match[1];
+                    }
+                }
+            }
+
+            // Method 3: Look for patent number pattern in the entire item text
+            if (!id || id === "") {
+                const itemText = item.innerText;
+                const patentMatch = itemText.match(/\b([A-Z]{2}\d{7,}[A-Z]\d?)\b/);
+                if (patentMatch) {
+                    id = patentMatch[1];
+                }
+            }
+
+            // Fallback
+            if (!id || id === "") {
+                id = "Unknown";
+            }
 
             // Dates
             const datesEl = item.querySelector("h4.dates");

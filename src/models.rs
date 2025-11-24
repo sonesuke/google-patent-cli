@@ -53,9 +53,7 @@ pub struct SearchOptions {
 
 impl SearchOptions {
     pub fn to_url(&self) -> anyhow::Result<String> {
-        if let Some(patent_number) = &self.patent_number {
-            Ok(format!("https://patents.google.com/patent/{}", patent_number))
-        } else if let Some(query) = &self.query {
+        self.patent_number.as_ref().map_or_else(|| self.query.as_ref().map_or_else(|| Err(anyhow::anyhow!("Must provide either --query or --patent")), |query| {
             let mut url_str = format!("https://patents.google.com/?q={}", query.replace(' ', "+"));
 
             if let Some(after) = &self.after_date {
@@ -67,13 +65,12 @@ impl SearchOptions {
             }
 
             Ok(url_str)
-        } else {
-            Err(anyhow::anyhow!("Must provide either --query or --patent"))
-        }
+        }), |patent_number| Ok(format!("https://patents.google.com/patent/{}", patent_number)))
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
