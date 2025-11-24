@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(google-patent-cli:*)",
+      "Bash(google-patent-cli help:*)",
+      "Bash(google-patent-cli query:*)",
       "Bash(google-patent-cli search:*)"
     ],
     "deny": [],

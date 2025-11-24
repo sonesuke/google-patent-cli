@@ -34,53 +34,57 @@ use patent_search::PatentSearcher;
 #[command(author, version = env!("CARGO_PKG_VERSION"), about = "A CLI for searching Google Patents", long_about = include_str!("../README.md"))]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
+
+    #[command(flatten)]
+    search_args: SearchArgs,
+}
+
+#[derive(clap::Args, Debug)]
+struct SearchArgs {
+    /// Search query
+    #[arg(short, long)]
+    query: Option<String>,
+
+    /// Patent number (e.g., US1234567)
+    #[arg(short, long)]
+    patent: Option<String>,
+
+    /// Filter by priority date after (YYYY-MM-DD)
+    #[arg(short, long)]
+    after: Option<String>,
+
+    /// Filter by priority date before (YYYY-MM-DD)
+    #[arg(short, long)]
+    before: Option<String>,
+
+    /// Limit the number of results
+    #[arg(short, long)]
+    limit: Option<usize>,
+
+    /// Run with visible browser window (default is headless)
+    #[arg(long, default_value_t = false)]
+    head: bool,
+
+    /// Output as JSON (default is JSON, but flag kept for clarity)
+    #[arg(long, default_value_t = true)]
+    json: bool,
+
+    /// Output raw HTML instead of JSON (for debugging)
+    #[arg(long)]
+    raw: bool,
+
+    /// Debug: Connect to existing browser WS URL
+    #[arg(long)]
+    debug_ws_url: Option<String>,
+
+    /// Enable debug output (shows Chrome logs)
+    #[arg(long, default_value_t = false)]
+    debug: bool,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Search for patents
-    Search {
-        /// Search query
-        #[arg(short, long)]
-        query: Option<String>,
-
-        /// Patent number (e.g., US1234567)
-        #[arg(short, long)]
-        patent: Option<String>,
-
-        /// Filter by priority date after (YYYY-MM-DD)
-        #[arg(short, long)]
-        after: Option<String>,
-
-        /// Filter by priority date before (YYYY-MM-DD)
-        #[arg(short, long)]
-        before: Option<String>,
-
-        /// Limit the number of results
-        #[arg(short, long)]
-        limit: Option<usize>,
-
-        /// Run with visible browser window (default is headless)
-        #[arg(long, default_value_t = false)]
-        head: bool,
-
-        /// Output as JSON (default is JSON, but flag kept for clarity)
-        #[arg(long, default_value_t = true)]
-        json: bool,
-
-        /// Output raw HTML instead of JSON (for debugging)
-        #[arg(long)]
-        raw: bool,
-
-        /// Debug: Connect to existing browser WS URL
-        #[arg(long)]
-        debug_ws_url: Option<String>,
-
-        /// Enable debug output (shows Chrome logs)
-        #[arg(long, default_value_t = false)]
-        debug: bool,
-    },
     /// Configure the CLI
     Config {
         /// Set the path to the browser executable
@@ -94,24 +98,24 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Search {
-            query,
-            patent,
-            after,
-            before,
-            limit,
-            head,
-            debug,
-            raw,
-            // json and debug_ws_url are not used in this branch anymore
-            json: _,
-            debug_ws_url: _,
-        } => {
-            let searcher = PatentSearcher::new(!head, debug).await?;
+        Some(Commands::Config { set_browser }) => {
+            let mut config = Config::load()?;
+            if let Some(path) = set_browser {
+                config.browser_path = Some(path);
+                config.save()?;
+                println!("Browser path updated.");
+            } else {
+                println!("Current configuration:");
+                println!("{:#?}", config);
+            }
+        }
+        None => {
+            let args = cli.search_args;
+            let searcher = PatentSearcher::new(!args.head, args.debug).await?;
 
-            if raw {
+            if args.raw {
                 // Output raw HTML for debugging
-                if let Some(patent_id) = patent {
+                if let Some(patent_id) = args.patent {
                     let html = searcher.get_raw_html(&patent_id).await?;
                     println!("{}", html);
                 } else {
@@ -121,27 +125,16 @@ async fn main() -> Result<()> {
             } else {
                 // Normal JSON output
                 let options = SearchOptions {
-                    query,
-                    patent_number: patent,
-                    after_date: after,
-                    before_date: before,
-                    limit,
+                    query: args.query,
+                    patent_number: args.patent,
+                    after_date: args.after,
+                    before_date: args.before,
+                    limit: args.limit,
                 };
 
                 let results = searcher.search(&options).await?;
                 let json = serde_json::to_string_pretty(&results)?;
                 println!("{}", json);
-            }
-        }
-        Commands::Config { set_browser } => {
-            let mut config = Config::load()?;
-            if let Some(path) = set_browser {
-                config.browser_path = Some(path);
-                config.save()?;
-                println!("Browser path updated.");
-            } else {
-                println!("Current configuration:");
-                println!("{:#?}", config);
             }
         }
     }
