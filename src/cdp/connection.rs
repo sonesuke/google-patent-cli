@@ -77,10 +77,7 @@ impl CdpConnection {
             }
         });
 
-        Ok(Self {
-            command_tx,
-            next_id: Arc::new(Mutex::new(1)),
-        })
+        Ok(Self { command_tx, next_id: Arc::new(Mutex::new(1)) })
     }
 
     /// Send a CDP command and wait for response

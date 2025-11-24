@@ -53,19 +53,28 @@ pub struct SearchOptions {
 
 impl SearchOptions {
     pub fn to_url(&self) -> anyhow::Result<String> {
-        self.patent_number.as_ref().map_or_else(|| self.query.as_ref().map_or_else(|| Err(anyhow::anyhow!("Must provide either --query or --patent")), |query| {
-            let mut url_str = format!("https://patents.google.com/?q={}", query.replace(' ', "+"));
+        self.patent_number.as_ref().map_or_else(
+            || {
+                self.query.as_ref().map_or_else(
+                    || Err(anyhow::anyhow!("Must provide either --query or --patent")),
+                    |query| {
+                        let mut url_str =
+                            format!("https://patents.google.com/?q={}", query.replace(' ', "+"));
 
-            if let Some(after) = &self.after_date {
-                url_str.push_str(&format!("&after={}", after));
-            }
+                        if let Some(after) = &self.after_date {
+                            url_str.push_str(&format!("&after={}", after));
+                        }
 
-            if let Some(before) = &self.before_date {
-                url_str.push_str(&format!("&before={}", before));
-            }
+                        if let Some(before) = &self.before_date {
+                            url_str.push_str(&format!("&before={}", before));
+                        }
 
-            Ok(url_str)
-        }), |patent_number| Ok(format!("https://patents.google.com/patent/{}", patent_number)))
+                        Ok(url_str)
+                    },
+                )
+            },
+            |patent_number| Ok(format!("https://patents.google.com/patent/{}", patent_number)),
+        )
     }
 }
 
@@ -106,17 +115,12 @@ mod tests {
     #[test]
     fn test_search_options_to_url() {
         // Test patent number URL
-        let options = SearchOptions {
-            patent_number: Some("US9152718B2".to_string()),
-            ..Default::default()
-        };
+        let options =
+            SearchOptions { patent_number: Some("US9152718B2".to_string()), ..Default::default() };
         assert_eq!(options.to_url().unwrap(), "https://patents.google.com/patent/US9152718B2");
 
         // Test query URL
-        let options = SearchOptions {
-            query: Some("foo bar".to_string()),
-            ..Default::default()
-        };
+        let options = SearchOptions { query: Some("foo bar".to_string()), ..Default::default() };
         assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo+bar");
 
         // Test query with dates

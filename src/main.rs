@@ -34,10 +34,7 @@ use patent_search::PatentSearcher;
 #[command(author, version = env!("CARGO_PKG_VERSION"), about = "A CLI for searching Google Patents", long_about = include_str!("../README.md"))]
 struct Cli {
     #[command(subcommand)]
-    command: Option<Commands>,
-
-    #[command(flatten)]
-    search_args: SearchArgs,
+    command: Commands,
 }
 
 #[derive(clap::Args, Debug)]
@@ -85,6 +82,11 @@ struct SearchArgs {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Search for patents
+    Search {
+        #[command(flatten)]
+        args: SearchArgs,
+    },
     /// Configure the CLI
     Config {
         /// Set the path to the browser executable
@@ -98,7 +100,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Commands::Config { set_browser }) => {
+        Commands::Config { set_browser } => {
             let mut config = Config::load()?;
             if let Some(path) = set_browser {
                 config.browser_path = Some(path);
@@ -109,8 +111,7 @@ async fn main() -> Result<()> {
                 println!("{:#?}", config);
             }
         }
-        None => {
-            let args = cli.search_args;
+        Commands::Search { args } => {
             let searcher = PatentSearcher::new(!args.head, args.debug).await?;
 
             if args.raw {

@@ -16,21 +16,15 @@ impl CdpPage {
         let connection = CdpConnection::connect(ws_url).await?;
 
         // Enable necessary domains
-        connection
-            .send_command("Page.enable", json!({}))
-            .await?;
-        connection
-            .send_command("Runtime.enable", json!({}))
-            .await?;
+        connection.send_command("Page.enable", json!({})).await?;
+        connection.send_command("Runtime.enable", json!({})).await?;
 
         Ok(Self { connection })
     }
 
     /// Navigate to a URL
     pub async fn goto(&self, url: &str) -> Result<()> {
-        self.connection
-            .send_command("Page.navigate", json!({ "url": url }))
-            .await?;
+        self.connection.send_command("Page.navigate", json!({ "url": url })).await?;
 
         Ok(())
     }
@@ -38,21 +32,18 @@ impl CdpPage {
     /// Wait for an element to appear on the page
     pub async fn wait_for_element(&self, selector: &str, timeout_secs: u64) -> Result<bool> {
         let start = std::time::Instant::now();
-        
+
         while start.elapsed().as_secs() < timeout_secs {
-            let script = format!(
-                "!!document.querySelector(\"{}\")",
-                selector.replace('"', "\\\"")
-            );
-            
+            let script = format!("!!document.querySelector(\"{}\")", selector.replace('"', "\\\""));
+
             let result = self.evaluate(&script).await?;
             if result.as_bool().unwrap_or(false) {
                 return Ok(true);
             }
-            
+
             sleep(Duration::from_millis(500)).await;
         }
-        
+
         Ok(false)
     }
 
@@ -60,9 +51,7 @@ impl CdpPage {
     pub async fn get_html(&self) -> Result<String> {
         let script = "document.documentElement.outerHTML";
         let result = self.evaluate(script).await?;
-        result.as_str()
-            .map(String::from)
-            .ok_or_else(|| anyhow!("Failed to get HTML"))
+        result.as_str().map(String::from).ok_or_else(|| anyhow!("Failed to get HTML"))
     }
 
     /// Evaluate JavaScript and return the result

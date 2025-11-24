@@ -66,7 +66,7 @@ mod tests {
     fn test_save_and_load_config() {
         let temp_dir = std::env::temp_dir();
         let config_path = temp_dir.join("google_patent_cli_test_config.toml");
-        
+
         // Clean up before test
         if config_path.exists() {
             let _ = std::fs::remove_file(&config_path);
