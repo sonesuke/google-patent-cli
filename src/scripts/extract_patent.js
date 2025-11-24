@@ -14,7 +14,7 @@
     const abstract = metaDesc ? metaDesc.getAttribute('content').trim() : null;
 
     // Extract description paragraphs with numbers
-    const descParas = Array.from(document.querySelectorAll('div.description-line[num]')).map(el => ({
+    const descParas = Array.from(document.querySelectorAll('div.description-paragraph[num]')).map(el => ({
         number: el.getAttribute('num'),
         id: el.id,
         text: el.innerText.trim()
