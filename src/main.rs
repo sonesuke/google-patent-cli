@@ -31,7 +31,7 @@ use patent_search::PatentSearcher;
 
 #[derive(Parser)]
 #[command(name = "google-patent-cli")]
-#[command(author, version = env!("CARGO_PKG_VERSION"), about = "A CLI for searching Google Patents", long_about = None)]
+#[command(author, version = env!("CARGO_PKG_VERSION"), about = "A CLI for searching Google Patents", long_about = include_str!("../README.md"))]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -56,6 +56,10 @@ enum Commands {
         /// Filter by priority date before (YYYY-MM-DD)
         #[arg(short, long)]
         before: Option<String>,
+
+        /// Limit the number of results
+        #[arg(short, long)]
+        limit: Option<usize>,
 
         /// Run with visible browser window (default is headless)
         #[arg(long, default_value_t = false)]
@@ -95,6 +99,7 @@ async fn main() -> Result<()> {
             patent,
             after,
             before,
+            limit,
             head,
             debug,
             raw,
@@ -120,6 +125,7 @@ async fn main() -> Result<()> {
                     patent_number: patent,
                     after_date: after,
                     before_date: before,
+                    limit,
                 };
 
                 let results = searcher.search(&options).await?;

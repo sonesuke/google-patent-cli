@@ -48,4 +48,5 @@ pub struct SearchOptions {
     pub patent_number: Option<String>,
     pub after_date: Option<String>,
     pub before_date: Option<String>,
+    pub limit: Option<usize>,
 }
