@@ -112,7 +112,8 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Search { args } => {
-            let searcher = PatentSearcher::new(!args.head, args.debug).await?;
+            let config = Config::load()?;
+            let searcher = PatentSearcher::new(config.browser_path, !args.head, args.debug).await?;
 
             if args.raw {
                 // Output raw HTML for debugging

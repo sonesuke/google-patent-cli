@@ -8,9 +8,13 @@ pub struct PatentSearcher {
 }
 
 impl PatentSearcher {
-    pub async fn new(headless: bool, debug: bool) -> Result<Self> {
+    pub async fn new(
+        browser_path: Option<std::path::PathBuf>,
+        headless: bool,
+        debug: bool,
+    ) -> Result<Self> {
         let args = vec!["--disable-blink-features=AutomationControlled"];
-        let browser = CdpBrowser::launch(None, args, headless, debug).await?;
+        let browser = CdpBrowser::launch(browser_path, args, headless, debug).await?;
 
         Ok(Self { browser })
     }
@@ -314,7 +318,9 @@ mod integration_tests {
     // Helper to create a searcher
     async fn create_searcher() -> PatentSearcher {
         // Use headless mode for tests
-        PatentSearcher::new(true, false).await.expect("Failed to create PatentSearcher")
+        PatentSearcher::new(None, true, false)
+            .await
+            .expect("Failed to create PatentSearcher")
     }
 
     #[tokio::test]
