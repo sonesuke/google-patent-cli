@@ -90,12 +90,35 @@
         filingDate = metaDate.getAttribute('content');
     }
 
+    // Get assignee from meta tags or DL
+    let assignee = null;
+    const metaAssignee = document.querySelector('meta[name="DC.contributor"][scheme="assignee"]');
+    if (metaAssignee) {
+        assignee = metaAssignee.getAttribute('content');
+    }
+
+    if (!assignee) {
+        // Fallback: Look for "Current Assignee" or "Original Assignee" in definitions
+        const dts = document.querySelectorAll('dt');
+        for (const dt of dts) {
+            const text = dt.innerText.trim();
+            if (text === "Current Assignee" || text === "Original Assignee" || text === "Assignee") {
+                const dd = dt.nextElementSibling;
+                if (dd && dd.tagName === 'DD') {
+                    assignee = dd.innerText.trim();
+                    break;
+                }
+            }
+        }
+    }
+
     return {
         title: title,
         abstract: abstract,
         description_paragraphs: descParas.length > 0 ? descParas : null,
         claims: claimsArray.length > 0 ? claimsArray : null,
         images: images.length > 0 ? images : null,
-        filing_date: filingDate
+        filing_date: filingDate,
+        assignee: assignee
     };
 })()

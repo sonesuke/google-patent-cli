@@ -197,6 +197,7 @@ fn parse_single_patent_result(
     });
 
     let filing_date = result["filing_date"].as_str().map(String::from);
+    let assignee = result["assignee"].as_str().map(String::from);
 
     Ok(vec![Patent {
         id: patent_number.to_string(),
@@ -208,6 +209,7 @@ fn parse_single_patent_result(
         snippet: None,
         description: None,
         filing_date,
+        assignee,
         url,
     }])
 }
@@ -239,6 +241,7 @@ mod tests {
                 "title": "Anomaly detection based on ensemble machine learning model",
                 "snippet": "accessing the entity profile...",
                 "filing_date": "2015-08-31",
+                "assignee": "Unknown",
                 "url": "https://patents.google.com/patent/Unknown"
             },
             {
@@ -246,6 +249,7 @@ mod tests {
                 "title": "Machine learning device, robot system and machine learning method",
                 "snippet": "Machine learning method which is carried out...",
                 "filing_date": "2017-09-12",
+                "assignee": "Fanuc Corp",
                 "url": "https://patents.google.com/patent/DE102018215057B4"
             },
             {
@@ -253,6 +257,7 @@ mod tests {
                 "title": "Distributed machine learning systems, apparatus, and methods",
                 "snippet": "A distributed, online machine learning system...",
                 "filing_date": "2016-07-18",
+                "assignee": "Google LLC",
                 "url": "https://patents.google.com/patent/US11694122B2"
             }
         ]);
@@ -273,6 +278,7 @@ mod tests {
             "title": "System and method for interactive big data analysis",
             "abstract": "A system and method for interactive big data analysis...",
             "filing_date": "2013-08-06",
+            "assignee": "Google LLC",
             "description_paragraphs": [
                 {"number": "0001", "id": "p1", "text": "CROSS-REFERENCE TO RELATED APPLICATIONS"}
             ],
@@ -299,6 +305,7 @@ mod tests {
             Some("A system and method for interactive big data analysis...")
         );
         assert_eq!(p.filing_date.as_deref(), Some("2013-08-06"));
+        assert_eq!(p.assignee.as_deref(), Some("Google LLC"));
 
         let paras = p.description_paragraphs.as_ref().unwrap();
         assert_eq!(paras.len(), 1);
@@ -318,9 +325,7 @@ mod integration_tests {
     // Helper to create a searcher
     async fn create_searcher() -> PatentSearcher {
         // Use headless mode for tests
-        PatentSearcher::new(None, true, false)
-            .await
-            .expect("Failed to create PatentSearcher")
+        PatentSearcher::new(None, true, false).await.expect("Failed to create PatentSearcher")
     }
 
     #[tokio::test]
