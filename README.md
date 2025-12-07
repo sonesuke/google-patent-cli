@@ -39,13 +39,13 @@ google-patent-cli search --query "blockchain" --after "2018-01-01" --before "202
 
 ### Lookup by patent number
 ```bash
-google-patent-cli search --patent "US10000000"
+google-patent-cli fetch "US10000000"
 ```
 
 ### Output raw HTML (debug)
 The `--raw` flag disables the structured JSON extraction and prints the full HTML source of the requested patent page. This is useful for debugging or inspecting the page manually.
 ```bash
-google-patent-cli search --patent "US20220319181A1" --raw
+google-patent-cli fetch "US20220319181A1" --raw
 ```
 
 ## Configuration
