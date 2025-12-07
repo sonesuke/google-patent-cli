@@ -329,6 +329,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_real_search_query() {
         let searcher = create_searcher().await;
         let options = SearchOptions {
@@ -351,6 +352,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_real_patent_lookup() {
         let searcher = create_searcher().await;
         let patent_id = "US9152718B2";
@@ -372,6 +374,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_real_search_limit() {
         let searcher = create_searcher().await;
         let limit = 2;
@@ -388,6 +391,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_real_raw_html() {
         let searcher = create_searcher().await;
         let patent_id = "US9152718B2";
@@ -409,6 +413,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_real_search_pagination() {
         let searcher = create_searcher().await;
         let limit = 25;
