@@ -49,16 +49,37 @@
             // The snippet is usually in a raw-html span following the dates
             // It might be inside the abstract div
             let snippet = "";
+            let assignee = null;
             const abstractDiv = item.querySelector("div.abstract");
             if (abstractDiv) {
                 const rawHtmls = abstractDiv.querySelectorAll("raw-html span");
-                // The last one is usually the snippet, or we can join them
-                // The first one might be assignee/inventor
-                for (const span of rawHtmls) {
-                    // Skip if it looks like a name (short) or if it's the title (already handled)
-                    if (span.innerText.length > 50) {
-                        snippet = span.innerText.trim();
-                        break;
+                const texts = Array.from(rawHtmls).map(el => el.innerText.trim()).filter(t => t.length > 0);
+
+                // Find the snippet (usually the longest text, or contains "...")
+                let snippetIndex = -1;
+                let maxLength = 0;
+
+                for (let i = 0; i < texts.length; i++) {
+                    const text = texts[i];
+                    if (text.length > maxLength) {
+                        maxLength = text.length;
+                        snippetIndex = i;
+                    }
+                }
+
+                if (snippetIndex !== -1) {
+                    snippet = texts[snippetIndex];
+
+                    // Everything before the snippet is likely Inventor/Assignee
+                    const metadata = texts.slice(0, snippetIndex);
+                    if (metadata.length > 0) {
+                        assignee = metadata.join(", ");
+                    }
+                } else if (texts.length > 0) {
+                    // Fallback: if no clear snippet, take the last one as snippet, others as assignee
+                    snippet = texts[texts.length - 1];
+                    if (texts.length > 1) {
+                        assignee = texts.slice(0, texts.length - 1).join(", ");
                     }
                 }
             }
@@ -78,6 +99,7 @@
                 id: id,
                 title: title,
                 snippet: snippet,
+                assignee: assignee,
                 filing_date: date,
                 grant_date: null,
                 publication_date: null,

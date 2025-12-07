@@ -39,6 +39,8 @@ pub struct Patent {
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filing_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<String>,
     pub url: String,
 }
 
