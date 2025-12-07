@@ -24,7 +24,22 @@ impl CdpBrowser {
         debug: bool,
     ) -> Result<Self> {
         let chrome_path = executable_path.unwrap_or_else(|| {
-            PathBuf::from("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+            #[cfg(target_os = "windows")]
+            {
+                PathBuf::from("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe")
+            }
+            #[cfg(target_os = "macos")]
+            {
+                PathBuf::from("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+            }
+            #[cfg(target_os = "linux")]
+            {
+                PathBuf::from("/usr/bin/google-chrome")
+            }
+            #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+            {
+                PathBuf::from("chrome")
+            }
         });
 
         // Create a temporary user data directory with a unique ID
