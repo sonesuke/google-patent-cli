@@ -41,11 +41,7 @@ struct Cli {
 struct SearchArgs {
     /// Search query
     #[arg(short, long)]
-    query: Option<String>,
-
-    /// Patent number (e.g., US1234567)
-    #[arg(short, long)]
-    patent: Option<String>,
+    query: String,
 
     /// Filter by priority date after (YYYY-MM-DD)
     #[arg(short, long)]
@@ -67,13 +63,27 @@ struct SearchArgs {
     #[arg(long, default_value_t = true)]
     json: bool,
 
+    /// Debug: Connect to existing browser WS URL
+    #[arg(long)]
+    debug_ws_url: Option<String>,
+
+    /// Enable debug output (shows Chrome logs)
+    #[arg(long, default_value_t = false)]
+    debug: bool,
+}
+
+#[derive(clap::Args, Debug)]
+struct FetchArgs {
+    /// Patent ID (e.g., US1234567)
+    patent_id: String,
+
     /// Output raw HTML instead of JSON (for debugging)
     #[arg(long)]
     raw: bool,
 
-    /// Debug: Connect to existing browser WS URL
-    #[arg(long)]
-    debug_ws_url: Option<String>,
+    /// Run with visible browser window (default is headless)
+    #[arg(long, default_value_t = false)]
+    head: bool,
 
     /// Enable debug output (shows Chrome logs)
     #[arg(long, default_value_t = false)]
@@ -86,6 +96,11 @@ enum Commands {
     Search {
         #[command(flatten)]
         args: SearchArgs,
+    },
+    /// Fetch a specific patent by ID
+    Fetch {
+        #[command(flatten)]
+        args: FetchArgs,
     },
     /// Configure the CLI
     Config {
@@ -115,27 +130,36 @@ async fn main() -> Result<()> {
             let config = Config::load()?;
             let searcher = PatentSearcher::new(config.browser_path, !args.head, args.debug).await?;
 
-            if args.raw {
-                // Output raw HTML for debugging
-                if let Some(patent_id) = args.patent {
-                    let html = searcher.get_raw_html(&patent_id).await?;
-                    println!("{}", html);
-                } else {
-                    eprintln!("Error: --raw flag requires --patent <ID>");
-                    std::process::exit(1);
-                }
-            } else {
-                // Normal JSON output
-                let options = SearchOptions {
-                    query: args.query,
-                    patent_number: args.patent,
-                    after_date: args.after,
-                    before_date: args.before,
-                    limit: args.limit,
-                };
+            let options = SearchOptions {
+                query: Some(args.query),
+                patent_number: None,
+                after_date: args.after,
+                before_date: args.before,
+                limit: args.limit,
+            };
 
+            let results = searcher.search(&options).await?;
+            let json = serde_json::to_string_pretty(&results)?;
+            println!("{}", json);
+        }
+        Commands::Fetch { args } => {
+            let config = Config::load()?;
+            let searcher = PatentSearcher::new(config.browser_path, !args.head, args.debug).await?;
+
+            if args.raw {
+                let html = searcher.get_raw_html(&args.patent_id).await?;
+                println!("{}", html);
+            } else {
+                let options = SearchOptions {
+                    query: None,
+                    patent_number: Some(args.patent_id),
+                    after_date: None,
+                    before_date: None,
+                    limit: None,
+                };
                 let results = searcher.search(&options).await?;
                 let json = serde_json::to_string_pretty(&results)?;
+
                 println!("{}", json);
             }
         }
