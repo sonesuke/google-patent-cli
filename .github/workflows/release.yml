@@ -9,8 +9,33 @@ permissions:
   contents: write
 
 jobs:
+  quality-checks:
+    name: Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Check build
+        run: cargo check --release
+
   build:
     name: Build ${{ matrix.platform }}
+    needs: quality-checks
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
