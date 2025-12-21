@@ -61,6 +61,12 @@ google-patent-cli search --query "machine learning" --before "2020-01-01"
 google-patent-cli search --query "machine learning" --head
 ```
 
+### Filter by assignee
+```bash
+# Patents assigned to a specific company
+google-patent-cli search --query "machine learning" --assignee "Google"
+```
+
 ### Filter by filing date
 ```bash
 # Patents filed after 2020‑01‑01

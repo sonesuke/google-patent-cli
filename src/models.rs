@@ -47,6 +47,7 @@ pub struct Patent {
 #[derive(Debug, Default)]
 pub struct SearchOptions {
     pub query: Option<String>,
+    pub assignee: Option<String>,
     pub patent_number: Option<String>,
     pub after_date: Option<String>,
     pub before_date: Option<String>,
@@ -62,6 +63,10 @@ impl SearchOptions {
                     |query| {
                         let mut url_str =
                             format!("https://patents.google.com/?q={}", query.replace(' ', "+"));
+
+                        if let Some(assignee) = &self.assignee {
+                            url_str.push_str(&format!("&assignee={}", assignee.replace(' ', "+")));
+                        }
 
                         if let Some(after) = &self.after_date {
                             url_str.push_str(&format!("&after={}", after));
@@ -104,6 +109,7 @@ mod tests {
     fn test_search_options_creation() {
         let options = SearchOptions {
             query: Some("test".to_string()),
+            assignee: None,
             patent_number: None,
             after_date: None,
             before_date: None,
@@ -124,6 +130,17 @@ mod tests {
         // Test query URL
         let options = SearchOptions { query: Some("foo bar".to_string()), ..Default::default() };
         assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo+bar");
+
+        // Test query with assignee
+        let options = SearchOptions {
+            query: Some("foo".to_string()),
+            assignee: Some("Google LLC".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            options.to_url().unwrap(),
+            "https://patents.google.com/?q=foo&assignee=Google+LLC"
+        );
 
         // Test query with dates
         let options = SearchOptions {

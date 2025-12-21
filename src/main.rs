@@ -43,6 +43,10 @@ struct SearchArgs {
     #[arg(short, long)]
     query: String,
 
+    /// Filter by assignee/applicant
+    #[arg(long)]
+    assignee: Option<String>,
+
     /// Filter by priority date after (YYYY-MM-DD)
     #[arg(short, long)]
     after: Option<String>,
@@ -132,6 +136,7 @@ async fn main() -> Result<()> {
 
             let options = SearchOptions {
                 query: Some(args.query),
+                assignee: args.assignee,
                 patent_number: None,
                 after_date: args.after,
                 before_date: args.before,
@@ -152,6 +157,7 @@ async fn main() -> Result<()> {
             } else {
                 let options = SearchOptions {
                     query: None,
+                    assignee: None,
                     patent_number: Some(args.patent_id),
                     after_date: None,
                     before_date: None,

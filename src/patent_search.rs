@@ -333,6 +333,7 @@ mod integration_tests {
         let searcher = create_searcher().await;
         let options = SearchOptions {
             query: Some("interactive big data analysis".to_string()),
+            assignee: None,
             patent_number: None,
             limit: None,
             ..Default::default()
@@ -356,6 +357,7 @@ mod integration_tests {
         let patent_id = "US9152718B2";
         let options = SearchOptions {
             query: None,
+            assignee: None,
             patent_number: Some(patent_id.to_string()),
             limit: None,
             ..Default::default()
