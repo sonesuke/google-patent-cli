@@ -73,7 +73,14 @@ google-patent-cli search --query "machine learning" --assignee "Google"
 google-patent-cli search --query "AI" --after "2020-01-01"
 
 # Patents filed between 2018‑01‑01 and 2020‑12‑31
+# Patents filed between 2018‑01‑01 and 2020‑12‑31
 google-patent-cli search --query "blockchain" --after "2018-01-01" --before "2020-12-31"
+```
+
+### Filter by country
+```bash
+# Patents valid in Japan (JP), United States (US), or China (CN)
+google-patent-cli search --query "camera" --country JP
 ```
 
 ### Lookup by patent number
