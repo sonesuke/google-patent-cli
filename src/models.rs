@@ -48,6 +48,7 @@ pub struct Patent {
 pub struct SearchOptions {
     pub query: Option<String>,
     pub assignee: Option<String>,
+    pub country: Option<String>,
     pub patent_number: Option<String>,
     pub after_date: Option<String>,
     pub before_date: Option<String>,
@@ -66,6 +67,10 @@ impl SearchOptions {
 
                         if let Some(assignee) = &self.assignee {
                             url_str.push_str(&format!("&assignee={}", assignee.replace(' ', "+")));
+                        }
+
+                        if let Some(country) = &self.country {
+                            url_str.push_str(&format!("&country={}", country));
                         }
 
                         if let Some(after) = &self.after_date {
@@ -110,6 +115,7 @@ mod tests {
         let options = SearchOptions {
             query: Some("test".to_string()),
             assignee: None,
+            country: None,
             patent_number: None,
             after_date: None,
             before_date: None,
@@ -135,11 +141,23 @@ mod tests {
         let options = SearchOptions {
             query: Some("foo".to_string()),
             assignee: Some("Google LLC".to_string()),
+            country: None,
             ..Default::default()
         };
         assert_eq!(
             options.to_url().unwrap(),
             "https://patents.google.com/?q=foo&assignee=Google+LLC"
+        );
+
+        // Test query with country
+        let options = SearchOptions {
+            query: Some("foo".to_string()),
+            country: Some("JP".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            options.to_url().unwrap(),
+            "https://patents.google.com/?q=foo&country=JP"
         );
 
         // Test query with dates
