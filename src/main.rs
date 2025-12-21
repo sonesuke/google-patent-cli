@@ -41,7 +41,7 @@ struct Cli {
 struct SearchArgs {
     /// Search query
     #[arg(short, long)]
-    query: String,
+    query: Option<String>,
 
     /// Filter by assignee/applicant
     #[arg(long)]
@@ -135,11 +135,15 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Search { args } => {
+            if args.query.is_none() && args.assignee.is_none() {
+                anyhow::bail!("At least one of --query or --assignee must be provided.");
+            }
+
             let config = Config::load()?;
             let searcher = PatentSearcher::new(config.browser_path, !args.head, args.debug).await?;
 
             let options = SearchOptions {
-                query: Some(args.query),
+                query: args.query,
                 assignee: args.assignee,
                 country: args.country,
                 patent_number: None,

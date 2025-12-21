@@ -57,36 +57,37 @@ pub struct SearchOptions {
 
 impl SearchOptions {
     pub fn to_url(&self) -> anyhow::Result<String> {
-        self.patent_number.as_ref().map_or_else(
-            || {
-                self.query.as_ref().map_or_else(
-                    || Err(anyhow::anyhow!("Must provide either --query or --patent")),
-                    |query| {
-                        let mut url_str =
-                            format!("https://patents.google.com/?q={}", query.replace(' ', "+"));
+        if let Some(patent_number) = &self.patent_number {
+            return Ok(format!("https://patents.google.com/patent/{}", patent_number));
+        }
 
-                        if let Some(assignee) = &self.assignee {
-                            url_str.push_str(&format!("&assignee={}", assignee.replace(' ', "+")));
-                        }
+        let mut params = Vec::new();
 
-                        if let Some(country) = &self.country {
-                            url_str.push_str(&format!("&country={}", country));
-                        }
+        if let Some(query) = &self.query {
+            params.push(format!("q={}", query.replace(' ', "+")));
+        }
 
-                        if let Some(after) = &self.after_date {
-                            url_str.push_str(&format!("&after={}", after));
-                        }
+        if let Some(assignee) = &self.assignee {
+            params.push(format!("assignee={}", assignee.replace(' ', "+")));
+        }
 
-                        if let Some(before) = &self.before_date {
-                            url_str.push_str(&format!("&before={}", before));
-                        }
+        if params.is_empty() {
+            return Err(anyhow::anyhow!("Must provide either --query, --assignee or --patent"));
+        }
 
-                        Ok(url_str)
-                    },
-                )
-            },
-            |patent_number| Ok(format!("https://patents.google.com/patent/{}", patent_number)),
-        )
+        if let Some(country) = &self.country {
+            params.push(format!("country={}", country));
+        }
+
+        if let Some(after) = &self.after_date {
+            params.push(format!("after={}", after));
+        }
+
+        if let Some(before) = &self.before_date {
+            params.push(format!("before={}", before));
+        }
+
+        Ok(format!("https://patents.google.com/?{}", params.join("&")))
     }
 }
 
@@ -136,6 +137,11 @@ mod tests {
         // Test query URL
         let options = SearchOptions { query: Some("foo bar".to_string()), ..Default::default() };
         assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo+bar");
+
+        // Test assignee only
+        let options =
+            SearchOptions { assignee: Some("Google LLC".to_string()), ..Default::default() };
+        assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?assignee=Google+LLC");
 
         // Test query with assignee
         let options = SearchOptions {
