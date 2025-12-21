@@ -276,7 +276,10 @@ mod tests {
 
         let sr = parse_search_results(results.clone(), Some(2)).unwrap();
         assert_eq!(sr.patents.len(), 2);
-        assert_eq!(sr.patents[0].title, "Anomaly detection based on ensemble machine learning model");
+        assert_eq!(
+            sr.patents[0].title,
+            "Anomaly detection based on ensemble machine learning model"
+        );
         assert_eq!(sr.patents[1].id, "DE102018215057B4");
         assert_eq!(sr.total_results, "1000");
 
@@ -437,7 +440,12 @@ mod integration_tests {
 
         let results = searcher.search(&options).await.expect("Pagination search failed");
 
-        assert_eq!(results.patents.len(), limit, "Should return exactly {} results via pagination", limit);
+        assert_eq!(
+            results.patents.len(),
+            limit,
+            "Should return exactly {} results via pagination",
+            limit
+        );
 
         // Verify results are unique (no duplicates from pagination)
         let ids: std::collections::HashSet<_> = results.patents.iter().map(|p| &p.id).collect();
