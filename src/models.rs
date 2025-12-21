@@ -155,10 +155,7 @@ mod tests {
             country: Some("JP".to_string()),
             ..Default::default()
         };
-        assert_eq!(
-            options.to_url().unwrap(),
-            "https://patents.google.com/?q=foo&country=JP"
-        );
+        assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo&country=JP");
 
         // Test query with dates
         let options = SearchOptions {
