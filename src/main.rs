@@ -47,6 +47,10 @@ struct SearchArgs {
     #[arg(long)]
     assignee: Option<String>,
 
+    /// Filter by country (JP, US, CN)
+    #[arg(long)]
+    country: Option<String>,
+
     /// Filter by priority date after (YYYY-MM-DD)
     #[arg(short, long)]
     after: Option<String>,
@@ -137,6 +141,7 @@ async fn main() -> Result<()> {
             let options = SearchOptions {
                 query: Some(args.query),
                 assignee: args.assignee,
+                country: args.country,
                 patent_number: None,
                 after_date: args.after,
                 before_date: args.before,
@@ -158,6 +163,7 @@ async fn main() -> Result<()> {
                 let options = SearchOptions {
                     query: None,
                     assignee: None,
+                    country: None,
                     patent_number: Some(args.patent_id),
                     after_date: None,
                     before_date: None,
