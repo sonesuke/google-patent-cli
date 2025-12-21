@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::cdp::{CdpBrowser, CdpPage};
-use crate::models::{Patent, SearchOptions};
+use crate::models::{Patent, SearchOptions, SearchResult};
 
 pub struct PatentSearcher {
     browser: CdpBrowser,
@@ -20,7 +20,7 @@ impl PatentSearcher {
     }
 
     /// Search for patents or fetch a specific patent
-    pub async fn search(&self, options: &SearchOptions) -> Result<Vec<Patent>> {
+    pub async fn search(&self, options: &SearchOptions) -> Result<SearchResult> {
         self.search_internal(options).await
     }
 
@@ -48,7 +48,7 @@ impl PatentSearcher {
         page.get_html().await
     }
 
-    async fn search_internal(&self, options: &SearchOptions) -> Result<Vec<Patent>> {
+    async fn search_internal(&self, options: &SearchOptions) -> Result<SearchResult> {
         let page_ws_url = self.browser.new_page().await?;
         let page = CdpPage::new(&page_ws_url).await?;
 
@@ -74,11 +74,14 @@ impl PatentSearcher {
             // Single patent page - extract structured data
             let result = page.evaluate(include_str!("scripts/extract_patent.js")).await?;
 
-            parse_single_patent_result(result, patent_number, base_url)
+            // For single patent, total_results is "1".
+            let patents = parse_single_patent_result(result, patent_number, base_url)?;
+            Ok(SearchResult { total_results: "1".to_string(), patents })
         } else {
             // Search results page - may need pagination
             let mut all_patents: Vec<Patent> = Vec::new();
             let limit = options.limit.unwrap_or(10);
+            let mut total_results_str = "Unknown".to_string();
 
             // Calculate how many pages we need to fetch
             // Google Patents shows 10 results per page
@@ -107,7 +110,14 @@ impl PatentSearcher {
                 let results =
                     page.evaluate(include_str!("scripts/extract_search_results.js")).await?;
 
-                let page_patents: Vec<Patent> = serde_json::from_value(results)?;
+                let sr: SearchResult = serde_json::from_value(results)?;
+
+                // Only capture total results from the first page (or all pages, should be same)
+                if page_num == 0 {
+                    total_results_str = sr.total_results;
+                }
+
+                let page_patents = sr.patents;
 
                 // If we got no results, stop pagination
                 if page_patents.is_empty() {
@@ -127,7 +137,7 @@ impl PatentSearcher {
                 all_patents.truncate(limit);
             }
 
-            Ok(all_patents)
+            Ok(SearchResult { total_results: total_results_str, patents: all_patents })
         }
     }
 }
@@ -215,16 +225,16 @@ fn parse_single_patent_result(
 }
 
 #[cfg(test)]
-fn parse_search_results(results: serde_json::Value, limit: Option<usize>) -> Result<Vec<Patent>> {
-    let mut patents: Vec<Patent> = serde_json::from_value(results)?;
+fn parse_search_results(results: serde_json::Value, limit: Option<usize>) -> Result<SearchResult> {
+    let mut sr: SearchResult = serde_json::from_value(results)?;
 
     if let Some(limit) = limit {
-        if patents.len() > limit {
-            patents.truncate(limit);
+        if sr.patents.len() > limit {
+            sr.patents.truncate(limit);
         }
     }
 
-    Ok(patents)
+    Ok(sr)
 }
 
 #[cfg(test)]
@@ -235,7 +245,9 @@ mod tests {
 
     #[test]
     fn test_parse_search_results_limit() {
-        let results = json!([
+        let results = json!({
+            "total_results": "1000",
+            "patents": [
             {
                 "id": "Unknown",
                 "title": "Anomaly detection based on ensemble machine learning model",
@@ -260,16 +272,17 @@ mod tests {
                 "assignee": "Google LLC",
                 "url": "https://patents.google.com/patent/US11694122B2"
             }
-        ]);
+        ]});
 
-        let patents = parse_search_results(results.clone(), Some(2)).unwrap();
-        assert_eq!(patents.len(), 2);
-        assert_eq!(patents[0].title, "Anomaly detection based on ensemble machine learning model");
-        assert_eq!(patents[1].id, "DE102018215057B4");
+        let sr = parse_search_results(results.clone(), Some(2)).unwrap();
+        assert_eq!(sr.patents.len(), 2);
+        assert_eq!(sr.patents[0].title, "Anomaly detection based on ensemble machine learning model");
+        assert_eq!(sr.patents[1].id, "DE102018215057B4");
+        assert_eq!(sr.total_results, "1000");
 
-        let patents = parse_search_results(results, None).unwrap();
-        assert_eq!(patents.len(), 3);
-        assert_eq!(patents[2].id, "US11694122B2");
+        let sr = parse_search_results(results, None).unwrap();
+        assert_eq!(sr.patents.len(), 3);
+        assert_eq!(sr.patents[2].id, "US11694122B2");
     }
 
     #[test]
@@ -341,9 +354,10 @@ mod integration_tests {
 
         let results = searcher.search(&options).await.expect("Search failed");
 
-        assert!(!results.is_empty(), "Should return at least one result");
+        assert!(!results.patents.is_empty(), "Should return at least one result");
+        assert_ne!(results.total_results, "Unknown", "Should return total results");
         // Verify the first result has some expected content
-        let first = &results[0];
+        let first = &results.patents[0];
         assert!(!first.title.is_empty(), "Title should not be empty");
         assert!(
             first.url.contains("patents.google.com"),
@@ -365,8 +379,8 @@ mod integration_tests {
 
         let results = searcher.search(&options).await.expect("Patent lookup failed");
 
-        assert_eq!(results.len(), 1, "Should return exactly one patent");
-        let patent = &results[0];
+        assert_eq!(results.patents.len(), 1, "Should return exactly one patent");
+        let patent = &results.patents[0];
         assert_eq!(patent.id, patent_id, "Should return the requested patent ID");
         assert!(!patent.title.is_empty(), "Title should not be empty");
         assert!(patent.abstract_text.is_some(), "Should have abstract");
@@ -386,7 +400,7 @@ mod integration_tests {
 
         let results = searcher.search(&options).await.expect("Search with limit failed");
 
-        assert_eq!(results.len(), limit, "Should return exactly {} results", limit);
+        assert_eq!(results.patents.len(), limit, "Should return exactly {} results", limit);
     }
 
     #[tokio::test]
@@ -423,10 +437,10 @@ mod integration_tests {
 
         let results = searcher.search(&options).await.expect("Pagination search failed");
 
-        assert_eq!(results.len(), limit, "Should return exactly {} results via pagination", limit);
+        assert_eq!(results.patents.len(), limit, "Should return exactly {} results via pagination", limit);
 
         // Verify results are unique (no duplicates from pagination)
-        let ids: std::collections::HashSet<_> = results.iter().map(|p| &p.id).collect();
-        assert_eq!(ids.len(), results.len(), "All results should have unique IDs");
+        let ids: std::collections::HashSet<_> = results.patents.iter().map(|p| &p.id).collect();
+        assert_eq!(ids.len(), results.patents.len(), "All results should have unique IDs");
     }
 }

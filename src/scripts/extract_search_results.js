@@ -1,7 +1,14 @@
 (() => {
+    // Extract total results count
+    let totalResults = "Unknown";
+    const countSpan = document.querySelector('search-results #count span.flex');
+    if (countSpan) {
+        totalResults = countSpan.innerText.trim();
+    }
+
     const items = document.querySelectorAll("search-result-item");
 
-    return Array.from(items)
+    const patents = Array.from(items)
         .map(item => {
             // Title
             const titleEl = item.querySelector(".result-title h3 raw-html span");
@@ -111,4 +118,9 @@
                 images: null
             };
         });
+
+    return {
+        total_results: totalResults,
+        patents: patents
+    };
 })()

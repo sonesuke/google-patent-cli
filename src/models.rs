@@ -22,6 +22,12 @@ pub struct PatentImage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct SearchResult {
+    pub total_results: String,
+    pub patents: Vec<Patent>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Patent {
     pub id: String,
     pub title: String,
