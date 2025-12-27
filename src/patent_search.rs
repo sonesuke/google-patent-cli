@@ -83,15 +83,19 @@ impl PatentSearcher {
             let limit = options.limit.unwrap_or(10);
             let mut total_results_str = "Unknown".to_string();
 
+            // Append num=100 to base_url to fetch more results per page if needed
+            // This reduces the need for multiple page loads for limits <= 100
+            let base_url = if limit > 10 { format!("{}&num=100", base_url) } else { base_url };
+
             // Calculate how many pages we need to fetch
-            // Google Patents shows 10 results per page
-            let pages_needed = limit.div_ceil(10);
+            // With num=100, we get 100 results per page (if limit > 10)
+            let results_per_page = if limit > 10 { 100 } else { 10 };
+            let pages_needed = limit.div_ceil(results_per_page);
 
             for page_num in 0..pages_needed {
                 // Construct URL with page parameter
-                // First page (page_num=0): no &page parameter
-                // Second page (page_num=1): &page=1
-                // Third page (page_num=2): &page=2, etc.
+                // Note: Google Patents generally uses start=N or page=N.
+                // With num=100, page=1 might give results 101-200.
                 let page_url = if page_num == 0 {
                     base_url.clone()
                 } else {
@@ -208,6 +212,12 @@ fn parse_single_patent_result(
 
     let filing_date = result["filing_date"].as_str().map(String::from);
     let assignee = result["assignee"].as_str().map(String::from);
+    let related_application: Option<String> =
+        result["related_application"].as_str().map(String::from);
+    let claiming_priority: Option<Vec<crate::models::ApplicationInfo>> =
+        serde_json::from_value(result["claiming_priority"].clone()).unwrap_or(None);
+    let family_applications: Option<Vec<crate::models::ApplicationInfo>> =
+        serde_json::from_value(result["family_applications"].clone()).unwrap_or(None);
 
     Ok(vec![Patent {
         id: patent_number.to_string(),
@@ -220,6 +230,9 @@ fn parse_single_patent_result(
         description: None,
         filing_date,
         assignee,
+        related_application,
+        claiming_priority,
+        family_applications,
         url,
     }])
 }
@@ -450,5 +463,41 @@ mod integration_tests {
         // Verify results are unique (no duplicates from pagination)
         let ids: std::collections::HashSet<_> = results.patents.iter().map(|p| &p.id).collect();
         assert_eq!(ids.len(), results.patents.len(), "All results should have unique IDs");
+    }
+
+    #[tokio::test]
+    async fn test_real_divisional_patent() {
+        let searcher = create_searcher().await;
+        // US10984918B2 is a known divisional patent
+        let patent_id = "US10984918B2";
+        let options = SearchOptions {
+            query: None,
+            assignee: None,
+            patent_number: Some(patent_id.to_string()),
+            limit: None,
+            ..Default::default()
+        };
+
+        let results = searcher.search(&options).await.expect("Patent lookup failed");
+
+        assert_eq!(results.patents.len(), 1);
+        let patent = &results.patents[0];
+        assert_eq!(patent.id, patent_id);
+
+        // Check related application info
+        assert!(patent.related_application.is_some(), "Should have related application info");
+        let related = patent.related_application.as_ref().unwrap();
+        // The text for this patent starts with "This application is a Division of..." OR "This application claims priority..."
+        let lower_related = related.to_lowercase();
+        assert!(
+            lower_related.contains("division") || 
+            lower_related.contains("continuation") || 
+            lower_related.contains("claim") || 
+            lower_related.contains("priority") ||
+            lower_related.contains("related") ||
+            lower_related.contains("benefit"),
+            "Related application text should contain division/continuation/priority/related, got: {}",
+            related
+        );
     }
 }

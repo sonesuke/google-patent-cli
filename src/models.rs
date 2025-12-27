@@ -47,7 +47,26 @@ pub struct Patent {
     pub filing_date: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub assignee: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub related_application: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claiming_priority: Option<Vec<ApplicationInfo>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub family_applications: Option<Vec<ApplicationInfo>>,
     pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApplicationInfo {
+    pub application_number: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filing_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Default)]
