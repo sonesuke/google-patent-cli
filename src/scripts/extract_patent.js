@@ -112,6 +112,118 @@
         }
     }
 
+    // Extract Related Applications
+    let relatedApplication = null;
+    let claimingPriority = [];
+    let familyApplications = [];
+
+    // Helper to extract application info from a row
+    const extractAppInfo = (row) => {
+        const appNumEl = row.querySelector('[itemprop="applicationNumber"]');
+        const priorityDateEl = row.querySelector('[itemprop="priorityDate"]');
+        const filingDateEl = row.querySelector('[itemprop="filingDate"]');
+        const titleEl = row.querySelector('[itemprop="title"]');
+
+        if (!appNumEl) return null;
+
+        const appNum = appNumEl.innerText.trim();
+        // Simple heuristic for country code: first 2 chars of app number if they are letters
+        let countryCode = null;
+        if (/^[A-Z]{2}/.test(appNum)) {
+            countryCode = appNum.substring(0, 2);
+        }
+
+        return {
+            application_number: appNum,
+            country_code: countryCode,
+            priority_date: priorityDateEl ? priorityDateEl.innerText.trim() : null,
+            filing_date: filingDateEl ? filingDateEl.innerText.trim() : null,
+            title: titleEl ? titleEl.innerText.trim() : null
+        };
+    };
+
+    // Extract Claims Priority
+    const priorityRows = document.querySelectorAll('tr[itemprop="appsClaimingPriority"]');
+    for (const row of priorityRows) {
+        const info = extractAppInfo(row);
+        if (info) claimingPriority.push(info);
+    }
+
+    // Extract Family Applications
+    const familyRows = document.querySelectorAll('tr[itemprop="applications"]');
+    for (const row of familyRows) {
+        const info = extractAppInfo(row);
+        if (info) familyApplications.push(info);
+    }
+
+    // Method 3: Worldwide Applications Timeline (Fallback)
+    if (claimingPriority.length === 0 && familyApplications.length === 0) {
+        const timeline = document.querySelector('.application-timeline');
+        if (timeline) {
+            const modifiers = timeline.querySelectorAll('state-modifier[data-result^="patent/"]');
+            for (const mod of modifiers) {
+                const resultPath = mod.getAttribute('data-result');
+                const id = resultPath.split('/')[1];
+
+                let appNum = null;
+                let filingDate = null;
+                let legalStatus = null;
+
+                const tooltip = mod.nextElementSibling;
+                if (tooltip && tooltip.tagName === 'OVERLAY-TOOLTIP') {
+                    const lines = tooltip.innerText.split('\n');
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (trimmed.startsWith('Application number:')) {
+                            appNum = trimmed.replace('Application number:', '').trim();
+                        } else if (trimmed.startsWith('Filing date:')) {
+                            filingDate = trimmed.replace('Filing date:', '').trim();
+                        }
+                    }
+                }
+
+                if (id) {
+                    // Determine if it's family or priority based on context or just add to family for now
+                    // The timeline usually shows the family.
+                    // Filter out the current patent if needed, but useful to include.
+
+                    const info = {
+                        application_number: appNum || id, // Use ID as fallback for app number
+                        country_code: id.substring(0, 2),
+                        priority_date: null,
+                        filing_date: filingDate,
+                        title: null // Title not usually in timeline tooltip
+                    };
+
+                    // Avoid duplicates
+                    if (!familyApplications.some(existing => existing.application_number === info.application_number)) {
+                        familyApplications.push(info);
+                    }
+                }
+            }
+        }
+    }
+
+    // Method 1: Look for "Related Applications" section in description
+    const headings = Array.from(document.querySelectorAll("h2, h3, h4, div.heading, b, strong, heading"));
+    for (const h of headings) {
+        if (h.innerText.trim().toUpperCase().includes("RELATED APPLICATIONS") || h.innerText.trim().toUpperCase().includes("CROSS-REFERENCE")) {
+            let sibling = h.nextElementSibling;
+            if (sibling) {
+                relatedApplication = sibling.innerText.trim();
+            }
+            break;
+        }
+    }
+
+    // Method 2: Look for extract specific text patterns at the beginning of the description
+    if (!relatedApplication && descParas.length > 0) {
+        const firstPara = descParas[0].text;
+        if (firstPara.match(/(?:division|continuation|continuation-in-part) of/i)) {
+            relatedApplication = firstPara;
+        }
+    }
+
     return {
         title: title,
         abstract: abstract,
@@ -119,6 +231,9 @@
         claims: claimsArray.length > 0 ? claimsArray : null,
         images: images.length > 0 ? images : null,
         filing_date: filingDate,
-        assignee: assignee
+        assignee: assignee,
+        related_application: relatedApplication,
+        claiming_priority: claimingPriority.length > 0 ? claimingPriority : null,
+        family_applications: familyApplications.length > 0 ? familyApplications : null
     };
 })()
