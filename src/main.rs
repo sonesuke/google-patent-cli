@@ -168,15 +168,19 @@ async fn main() -> Result<()> {
                     query: None,
                     assignee: None,
                     country: None,
-                    patent_number: Some(args.patent_id),
+                    patent_number: Some(args.patent_id.clone()),
                     after_date: None,
                     before_date: None,
                     limit: None,
                 };
-                let results = searcher.search(&options).await?;
-                let json = serde_json::to_string_pretty(&results)?;
-
-                println!("{}", json);
+                let mut results = searcher.search(&options).await?;
+                if let Some(patent) = results.patents.pop() {
+                    let json = serde_json::to_string_pretty(&patent)?;
+                    println!("{}", json);
+                } else {
+                    eprintln!("No patent found with ID: {}", args.patent_id);
+                    std::process::exit(1);
+                }
             }
         }
     }
