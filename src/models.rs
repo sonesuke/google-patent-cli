@@ -22,8 +22,18 @@ pub struct PatentImage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct SummaryItem {
+    pub name: String,
+    pub percentage: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SearchResult {
     pub total_results: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_assignees: Option<Vec<SummaryItem>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_cpcs: Option<Vec<SummaryItem>>,
     pub patents: Vec<Patent>,
 }
 
@@ -93,7 +103,7 @@ impl SearchOptions {
         }
 
         if let Some(assignee) = &self.assignee {
-            params.push(format!("assignee={}", assignee.replace(' ', "+")));
+            params.push(format!("assignee=\"{}\"", assignee.replace(' ', "+")));
         }
 
         if params.is_empty() {
@@ -166,7 +176,10 @@ mod tests {
         // Test assignee only
         let options =
             SearchOptions { assignee: Some("Google LLC".to_string()), ..Default::default() };
-        assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?assignee=Google+LLC");
+        assert_eq!(
+            options.to_url().unwrap(),
+            "https://patents.google.com/?assignee=\"Google+LLC\""
+        );
 
         // Test query with assignee
         let options = SearchOptions {
@@ -177,7 +190,7 @@ mod tests {
         };
         assert_eq!(
             options.to_url().unwrap(),
-            "https://patents.google.com/?q=foo&assignee=Google+LLC"
+            "https://patents.google.com/?q=foo&assignee=\"Google+LLC\""
         );
 
         // Test query with country

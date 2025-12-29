@@ -1,4 +1,46 @@
 (() => {
+    // Helper function to find element by text content
+    function findElementByText(text, root = document) {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+        let node;
+        while (node = walker.nextNode()) {
+            if (node.textContent.trim() === text) {
+                return node.parentElement;
+            }
+        }
+        const allElements = root.querySelectorAll('*');
+        for (const el of allElements) {
+            if (el.shadowRoot) {
+                const found = findElementByText(text, el.shadowRoot);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    // Helper function to extract summary items by data attribute
+    function extractSummaryItemsByAttribute(dataAttr) {
+        const items = [];
+        const stateModifiers = document.querySelectorAll(`state-modifier[${dataAttr}]`);
+
+        for (const modifier of stateModifiers) {
+            const name = modifier.getAttribute(dataAttr);
+            // Find the percentage value - it's in a sibling .value element
+            const nameBlock = modifier.closest('.nameblock');
+            let percentage = '';
+            if (nameBlock) {
+                const valueEl = nameBlock.querySelector('.value');
+                if (valueEl) {
+                    percentage = valueEl.textContent.trim();
+                }
+            }
+            if (name) {
+                items.push({ name, percentage });
+            }
+        }
+        return items;
+    }
+
     // Extract total results count
     let totalResults = "Unknown";
     const countSpan = document.querySelector('search-results #count span.flex');
@@ -6,6 +48,22 @@
         totalResults = countSpan.innerText.trim();
     }
 
+    // --- Extract Assignees using data-assignee attribute ---
+    // First, click Expand to show all items
+    let expandBtn = findElementByText('Expand');
+    if (expandBtn) {
+        expandBtn.click();
+    }
+
+    let topAssignees = extractSummaryItemsByAttribute('data-assignee');
+    if (topAssignees.length === 0) {
+        topAssignees = null;
+    }
+
+    // CPCs are extracted separately via two-step process in Rust
+    let topCpcs = null;
+
+    // --- Extract Patents ---
     const items = document.querySelectorAll("search-result-item");
 
     const patents = Array.from(items)
@@ -121,6 +179,9 @@
 
     return {
         total_results: totalResults,
+        top_assignees: topAssignees,
+        top_cpcs: topCpcs,
         patents: patents
     };
 })()
+
