@@ -254,6 +254,7 @@ fn parse_single_patent_result(
         serde_json::from_value(result["claiming_priority"].clone()).unwrap_or(None);
     let family_applications: Option<Vec<crate::models::ApplicationInfo>> =
         serde_json::from_value(result["family_applications"].clone()).unwrap_or(None);
+    let legal_status = result["legal_status"].as_str().map(String::from);
 
     Ok(vec![Patent {
         id: patent_number.to_string(),
@@ -269,6 +270,7 @@ fn parse_single_patent_result(
         related_application,
         claiming_priority,
         family_applications,
+        legal_status,
         url,
     }])
 }
