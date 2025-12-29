@@ -112,6 +112,12 @@ impl SearchOptions {
 
         if let Some(country) = &self.country {
             params.push(format!("country={}", country));
+            // Add language filter for JP and CN
+            match country.to_uppercase().as_str() {
+                "JP" => params.push("language=JAPANESE".to_string()),
+                "CN" => params.push("language=CHINESE".to_string()),
+                _ => {}
+            }
         }
 
         if let Some(after) = &self.after_date {
@@ -193,13 +199,29 @@ mod tests {
             "https://patents.google.com/?q=foo&assignee=\"Google+LLC\""
         );
 
-        // Test query with country
+        // Test query with country (JP should add language=JAPANESE)
         let options = SearchOptions {
             query: Some("foo".to_string()),
             country: Some("JP".to_string()),
             ..Default::default()
         };
-        assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo&country=JP");
+        assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo&country=JP&language=JAPANESE");
+
+        // Test query with country (CN should add language=CHINESE)
+        let options = SearchOptions {
+            query: Some("foo".to_string()),
+            country: Some("CN".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo&country=CN&language=CHINESE");
+
+        // Test query with country (US should NOT add language)
+        let options = SearchOptions {
+            query: Some("foo".to_string()),
+            country: Some("US".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo&country=US");
 
         // Test query with dates
         let options = SearchOptions {
