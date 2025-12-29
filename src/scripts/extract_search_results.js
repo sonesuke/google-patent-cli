@@ -1,4 +1,24 @@
-(() => {
+(async () => {
+    // Helper function to wait for elements with retry
+    async function waitForElements(selector, maxAttempts = 10, delayMs = 300) {
+        for (let i = 0; i < maxAttempts; i++) {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) return elements;
+            await new Promise(r => setTimeout(r, delayMs));
+        }
+        return document.querySelectorAll(selector);
+    }
+
+    // Helper function to wait for a single element
+    async function waitForElement(selector, maxAttempts = 10, delayMs = 300) {
+        for (let i = 0; i < maxAttempts; i++) {
+            const element = document.querySelector(selector);
+            if (element) return element;
+            await new Promise(r => setTimeout(r, delayMs));
+        }
+        return document.querySelector(selector);
+    }
+
     // Helper function to find element by text content
     function findElementByText(text, root = document) {
         const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
@@ -41,9 +61,9 @@
         return items;
     }
 
-    // Extract total results count
+    // Extract total results count with retry
     let totalResults = "Unknown";
-    const countSpan = document.querySelector('search-results #count span.flex');
+    const countSpan = await waitForElement('search-results #count span.flex');
     if (countSpan) {
         totalResults = countSpan.innerText.trim();
     }
@@ -53,6 +73,8 @@
     let expandBtn = findElementByText('Expand');
     if (expandBtn) {
         expandBtn.click();
+        // Wait a bit for expansion animation
+        await new Promise(r => setTimeout(r, 200));
     }
 
     let topAssignees = extractSummaryItemsByAttribute('data-assignee');
@@ -63,8 +85,8 @@
     // CPCs are extracted separately via two-step process in Rust
     let topCpcs = null;
 
-    // --- Extract Patents ---
-    const items = document.querySelectorAll("search-result-item");
+    // --- Extract Patents with retry ---
+    const items = await waitForElements("search-result-item");
 
     const patents = Array.from(items)
         .map(item => {
