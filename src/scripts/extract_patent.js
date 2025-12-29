@@ -11,7 +11,8 @@
 
     // Get abstract from meta description
     const metaDesc = document.querySelector('meta[name="description"]');
-    const abstract = metaDesc ? metaDesc.getAttribute('content').trim() : null;
+    let abstract = metaDesc ? metaDesc.getAttribute('content').trim() : null;
+    // abstract will be finalized after descParas extraction (fallback logic below)
 
     // Extract description paragraphs with numbers
     const descParas = Array.from(document.querySelectorAll('div.description-paragraph[num]')).map(el => ({
@@ -64,6 +65,12 @@
                 });
             }
         }
+    }
+
+    // Fallback: if abstract is null or empty, use first 2 description paragraphs
+    if ((!abstract || abstract === '') && descParas.length > 0) {
+        const fallbackParas = descParas.slice(0, 2).map(p => p.text);
+        abstract = fallbackParas.join('\n');
     }
 
     // Extract claims with numbers

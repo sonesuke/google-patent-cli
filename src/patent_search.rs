@@ -43,7 +43,8 @@ impl PatentSearcher {
         page.goto(&url).await?;
 
         // Wait for page to load (meta description)
-        let loaded = page.wait_for_element("meta[name='description']", 15).await?;
+        let loaded =
+            page.wait_for_element("meta[name='description'], meta[name='DC.title']", 15).await?;
         if !loaded {
             return Err(anyhow::anyhow!("Page failed to load within timeout"));
         }
@@ -68,8 +69,10 @@ impl PatentSearcher {
             // Single patent lookup - no pagination needed
             page.goto(&base_url).await?;
 
-            // Wait for meta description tag to ensure page is loaded
-            let loaded = page.wait_for_element("meta[name='description']", 15).await?;
+            // Wait for meta description or title tag to ensure page is loaded
+            let loaded = page
+                .wait_for_element("meta[name='description'], meta[name='DC.title']", 15)
+                .await?;
             if !loaded {
                 return Err(anyhow::anyhow!("Page failed to load within timeout"));
             }
