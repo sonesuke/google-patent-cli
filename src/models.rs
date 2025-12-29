@@ -205,7 +205,10 @@ mod tests {
             country: Some("JP".to_string()),
             ..Default::default()
         };
-        assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo&country=JP&language=JAPANESE");
+        assert_eq!(
+            options.to_url().unwrap(),
+            "https://patents.google.com/?q=foo&country=JP&language=JAPANESE"
+        );
 
         // Test query with country (CN should add language=CHINESE)
         let options = SearchOptions {
@@ -213,7 +216,10 @@ mod tests {
             country: Some("CN".to_string()),
             ..Default::default()
         };
-        assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo&country=CN&language=CHINESE");
+        assert_eq!(
+            options.to_url().unwrap(),
+            "https://patents.google.com/?q=foo&country=CN&language=CHINESE"
+        );
 
         // Test query with country (US should NOT add language)
         let options = SearchOptions {

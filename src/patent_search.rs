@@ -13,7 +13,17 @@ impl PatentSearcher {
         headless: bool,
         debug: bool,
     ) -> Result<Self> {
-        let args = vec!["--disable-blink-features=AutomationControlled"];
+        let mut args = vec!["--disable-blink-features=AutomationControlled"];
+
+        // Add stability flags for CI/Container environments
+        if std::env::var("CI").is_ok() {
+            args.extend_from_slice(&[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+            ]);
+        }
         let browser = CdpBrowser::launch(browser_path, args, headless, debug).await?;
 
         Ok(Self { browser })
@@ -70,6 +80,9 @@ impl PatentSearcher {
                     15,
                 )
                 .await?;
+
+            // Give a little time for all dynamic content (like claims) to fully render
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
             // Single patent page - extract structured data
             let result = page.evaluate(include_str!("scripts/extract_patent.js")).await?;
