@@ -76,12 +76,19 @@ impl PatentSearcher {
 
             // For single patent, total_results is "1".
             let patents = parse_single_patent_result(result, patent_number, base_url)?;
-            Ok(SearchResult { total_results: "1".to_string(), patents })
+            Ok(SearchResult {
+                total_results: "1".to_string(),
+                top_assignees: None,
+                top_cpcs: None,
+                patents,
+            })
         } else {
             // Search results page - may need pagination
             let mut all_patents: Vec<Patent> = Vec::new();
             let limit = options.limit.unwrap_or(10);
             let mut total_results_str = "Unknown".to_string();
+            let mut top_assignees: Option<Vec<crate::models::SummaryItem>> = None;
+            let mut top_cpcs: Option<Vec<crate::models::SummaryItem>> = None;
 
             // Append num=100 to base_url to fetch more results per page if needed
             // This reduces the need for multiple page loads for limits <= 100
@@ -116,9 +123,17 @@ impl PatentSearcher {
 
                 let sr: SearchResult = serde_json::from_value(results)?;
 
-                // Only capture total results from the first page (or all pages, should be same)
+                // Only capture total results and summary data from the first page
                 if page_num == 0 {
                     total_results_str = sr.total_results;
+                    top_assignees = sr.top_assignees;
+
+                    // Two-step CPC extraction: click CPCs tab and wait for DOM update
+                    let _ = page.evaluate(include_str!("scripts/click_cpcs_tab.js")).await?;
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    let cpcs_result =
+                        page.evaluate(include_str!("scripts/extract_cpcs.js")).await?;
+                    top_cpcs = serde_json::from_value(cpcs_result).unwrap_or(None);
                 }
 
                 let page_patents = sr.patents;
@@ -141,7 +156,12 @@ impl PatentSearcher {
                 all_patents.truncate(limit);
             }
 
-            Ok(SearchResult { total_results: total_results_str, patents: all_patents })
+            Ok(SearchResult {
+                total_results: total_results_str,
+                top_assignees,
+                top_cpcs,
+                patents: all_patents,
+            })
         }
     }
 }
