@@ -231,6 +231,42 @@
         }
     }
 
+    // Extract legal status (e.g., "Active", "Expired", "Pending", etc.)
+    let legalStatus = null;
+
+    // Method 1: Look for the current event in application-timeline
+    // Structure: .event[current] contains .legal-status label and .title-text with the value
+    const currentEvent = document.querySelector('.event[current]');
+    if (currentEvent) {
+        const titleText = currentEvent.querySelector('.title-text');
+        if (titleText) {
+            legalStatus = titleText.innerText.trim();
+        }
+    }
+
+    // Method 2: Look for state-label element
+    if (!legalStatus) {
+        const stateLabel = document.querySelector('state-label');
+        if (stateLabel) {
+            legalStatus = stateLabel.innerText.trim();
+        }
+    }
+
+    // Method 3: Look in definition list for "Status" or "Legal status"
+    if (!legalStatus) {
+        const dts = document.querySelectorAll('dt');
+        for (const dt of dts) {
+            const text = dt.innerText.trim().toLowerCase();
+            if (text === 'status' || text === 'legal status') {
+                const dd = dt.nextElementSibling;
+                if (dd && dd.tagName === 'DD') {
+                    legalStatus = dd.innerText.trim();
+                    break;
+                }
+            }
+        }
+    }
+
     return {
         title: title,
         abstract: abstract,
@@ -241,6 +277,7 @@
         assignee: assignee,
         related_application: relatedApplication,
         claiming_priority: claimingPriority.length > 0 ? claimingPriority : null,
-        family_applications: familyApplications.length > 0 ? familyApplications : null
+        family_applications: familyApplications.length > 0 ? familyApplications : null,
+        legal_status: legalStatus
     };
 })()

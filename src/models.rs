@@ -63,6 +63,8 @@ pub struct Patent {
     pub claiming_priority: Option<Vec<ApplicationInfo>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub family_applications: Option<Vec<ApplicationInfo>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub legal_status: Option<String>,
     pub url: String,
 }
 
