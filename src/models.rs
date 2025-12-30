@@ -84,7 +84,7 @@ pub struct ApplicationInfo {
 #[derive(Debug, Default)]
 pub struct SearchOptions {
     pub query: Option<String>,
-    pub assignee: Option<String>,
+    pub assignee: Option<Vec<String>>,
     pub country: Option<String>,
     pub patent_number: Option<String>,
     pub after_date: Option<String>,
@@ -99,16 +99,26 @@ impl SearchOptions {
         }
 
         let mut params = Vec::new();
+        let mut q_parts = Vec::new();
 
         if let Some(query) = &self.query {
-            params.push(format!("q={}", query.replace(' ', "+")));
+            q_parts.push(query.replace(' ', "+"));
         }
 
-        if let Some(assignee) = &self.assignee {
-            params.push(format!("assignee=\"{}\"", assignee.replace(' ', "+")));
+        if let Some(assignees) = &self.assignee {
+            if !assignees.is_empty() {
+                let formatted_assignees: Vec<String> =
+                    assignees.iter().map(|a| format!("\"{}\"", a.replace(' ', "+"))).collect();
+
+                q_parts.push(format!("assignee:({})", formatted_assignees.join("+OR+")));
+            }
         }
 
-        if params.is_empty() {
+        if !q_parts.is_empty() {
+            params.push(format!("q={}", q_parts.join("+")));
+        }
+
+        if params.is_empty() && self.patent_number.is_none() {
             return Err(anyhow::anyhow!("Must provide either --query, --assignee or --patent"));
         }
 
@@ -181,24 +191,47 @@ mod tests {
         let options = SearchOptions { query: Some("foo bar".to_string()), ..Default::default() };
         assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo+bar");
 
-        // Test assignee only
+        // Test assignee only (single assignee)
         let options =
-            SearchOptions { assignee: Some("Google LLC".to_string()), ..Default::default() };
+            SearchOptions { assignee: Some(vec!["Google LLC".to_string()]), ..Default::default() };
+        // q=assignee:("Google+LLC")
         assert_eq!(
             options.to_url().unwrap(),
-            "https://patents.google.com/?assignee=\"Google+LLC\""
+            "https://patents.google.com/?q=assignee:(\"Google+LLC\")"
+        );
+
+        // Test assignee (multiple assignees)
+        let options = SearchOptions {
+            assignee: Some(vec!["Google LLC".to_string(), "Microsoft Corp".to_string()]),
+            ..Default::default()
+        };
+        // q=assignee:("Google+LLC"+OR+"Microsoft+Corp")
+        assert_eq!(
+            options.to_url().unwrap(),
+            "https://patents.google.com/?q=assignee:(\"Google+LLC\"+OR+\"Microsoft+Corp\")"
+        );
+
+        // Test assignee (comma handling)
+        let options = SearchOptions {
+            assignee: Some(vec!["Salesforce.com, inc.".to_string()]),
+            ..Default::default()
+        };
+        assert_eq!(
+            options.to_url().unwrap(),
+            "https://patents.google.com/?q=assignee:(\"Salesforce.com,+inc.\")"
         );
 
         // Test query with assignee
         let options = SearchOptions {
             query: Some("foo".to_string()),
-            assignee: Some("Google LLC".to_string()),
+            assignee: Some(vec!["Google LLC".to_string()]),
             country: None,
             ..Default::default()
         };
+        // q=foo+assignee:("Google+LLC")
         assert_eq!(
             options.to_url().unwrap(),
-            "https://patents.google.com/?q=foo&assignee=\"Google+LLC\""
+            "https://patents.google.com/?q=foo+assignee:(\"Google+LLC\")"
         );
 
         // Test query with country (JP should add language=JAPANESE)
