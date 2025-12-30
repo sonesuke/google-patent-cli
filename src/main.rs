@@ -44,8 +44,8 @@ struct SearchArgs {
     query: Option<String>,
 
     /// Filter by assignee/applicant
-    #[arg(long)]
-    assignee: Option<String>,
+    #[arg(long, num_args = 1..)]
+    assignee: Option<Vec<String>>,
 
     /// Filter by country (JP, US, CN)
     #[arg(long)]
