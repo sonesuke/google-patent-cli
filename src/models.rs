@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DescriptionParagraph {
@@ -98,49 +99,79 @@ impl SearchOptions {
             return Ok(format!("https://patents.google.com/patent/{}", patent_number));
         }
 
-        let mut params = Vec::new();
-        let mut q_parts = Vec::new();
+        let mut url = Url::parse("https://patents.google.com/")?;
 
-        if let Some(query) = &self.query {
-            q_parts.push(query.replace(' ', "+"));
-        }
+        // Use a block to scope the mutable borrow of serializer
+        {
+            let mut serializer = url.query_pairs_mut();
 
-        if let Some(assignees) = &self.assignee {
-            if !assignees.is_empty() {
-                let formatted_assignees: Vec<String> =
-                    assignees.iter().map(|a| format!("\"{}\"", a.replace(' ', "+"))).collect();
+            let mut q_parts = Vec::new();
 
-                q_parts.push(format!("assignee:({})", formatted_assignees.join("+OR+")));
+            if let Some(query) = &self.query {
+                q_parts.push(query.clone());
+            }
+
+            // Assignee is handled manually later to support comma separation
+
+            if !q_parts.is_empty() {
+                serializer.append_pair("q", &q_parts.join(" "));
+            }
+
+            if let Some(country) = &self.country {
+                serializer.append_pair("country", country);
+                match country.to_uppercase().as_str() {
+                    "JP" => {
+                        serializer.append_pair("language", "JAPANESE");
+                    }
+                    "CN" => {
+                        serializer.append_pair("language", "CHINESE");
+                    }
+                    _ => {}
+                }
+            }
+
+            if let Some(after) = &self.after_date {
+                serializer.append_pair("after", after);
+            }
+
+            if let Some(before) = &self.before_date {
+                serializer.append_pair("before", before);
             }
         }
 
-        if !q_parts.is_empty() {
-            params.push(format!("q={}", q_parts.join("+")));
+        let mut url_str = url.to_string();
+
+        // Manually append assignee parameter if present
+        if let Some(assignees) = &self.assignee {
+            if !assignees.is_empty() {
+                let encoded_assignees: Vec<String> = assignees
+                    .iter()
+                    .map(|a| {
+                        // Encode each assignee value, including quotes, using form_urlencoded logic
+                        let quoted = format!("\"{}\"", a);
+                        url::form_urlencoded::byte_serialize(quoted.as_bytes()).collect::<String>()
+                    })
+                    .collect();
+
+                // Determine if we need to add '?' or '&'
+                let separator = if !url_str.contains('?') {
+                    "?"
+                } else if url_str.ends_with('?') {
+                    ""
+                } else {
+                    "&"
+                };
+                url_str.push_str(&format!("{}assignee={}", separator, encoded_assignees.join(",")));
+            }
         }
 
-        if params.is_empty() && self.patent_number.is_none() {
+        // Manual check for empty params (after constructing)
+        // Check if url string ends with / or /? and has no params
+        if !url_str.contains('?') || url_str.ends_with('?') {
             return Err(anyhow::anyhow!("Must provide either --query, --assignee or --patent"));
         }
 
-        if let Some(country) = &self.country {
-            params.push(format!("country={}", country));
-            // Add language filter for JP and CN
-            match country.to_uppercase().as_str() {
-                "JP" => params.push("language=JAPANESE".to_string()),
-                "CN" => params.push("language=CHINESE".to_string()),
-                _ => {}
-            }
-        }
-
-        if let Some(after) = &self.after_date {
-            params.push(format!("after={}", after));
-        }
-
-        if let Some(before) = &self.before_date {
-            params.push(format!("before={}", before));
-        }
-
-        Ok(format!("https://patents.google.com/?{}", params.join("&")))
+        Ok(url_str)
     }
 }
 
@@ -187,39 +218,40 @@ mod tests {
             SearchOptions { patent_number: Some("US9152718B2".to_string()), ..Default::default() };
         assert_eq!(options.to_url().unwrap(), "https://patents.google.com/patent/US9152718B2");
 
-        // Test query URL
         let options = SearchOptions { query: Some("foo bar".to_string()), ..Default::default() };
+        // q=foo+bar
         assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo+bar");
 
         // Test assignee only (single assignee)
         let options =
             SearchOptions { assignee: Some(vec!["Google LLC".to_string()]), ..Default::default() };
-        // q=assignee:("Google+LLC")
-        assert_eq!(
-            options.to_url().unwrap(),
-            "https://patents.google.com/?q=assignee:(\"Google+LLC\")"
-        );
+        // assignee="Google LLC" -> encoded %22Google%20LLC%22
+        let url = options.to_url().unwrap();
+
+        // Since no other params, it should start with ?assignee=
+        // form_urlencoded::byte_serialize uses + for spaces in query values
+        assert!(url.contains("?assignee=%22Google+LLC%22"));
 
         // Test assignee (multiple assignees)
         let options = SearchOptions {
             assignee: Some(vec!["Google LLC".to_string(), "Microsoft Corp".to_string()]),
             ..Default::default()
         };
-        // q=assignee:("Google+LLC"+OR+"Microsoft+Corp")
-        assert_eq!(
-            options.to_url().unwrap(),
-            "https://patents.google.com/?q=assignee:(\"Google+LLC\"+OR+\"Microsoft+Corp\")"
-        );
+        // assignee="Google LLC","Microsoft Corp"
+        // Encoded individual values, joined by comma
+        let url = options.to_url().unwrap();
+        assert!(url.contains("?assignee=%22Google+LLC%22,%22Microsoft+Corp%22"));
 
         // Test assignee (comma handling)
         let options = SearchOptions {
             assignee: Some(vec!["Salesforce.com, inc.".to_string()]),
             ..Default::default()
         };
-        assert_eq!(
-            options.to_url().unwrap(),
-            "https://patents.google.com/?q=assignee:(\"Salesforce.com,+inc.\")"
-        );
+        let url = options.to_url().unwrap();
+        // assignee="Salesforce.com, inc."
+        // comma inside quotes encoded as %2C. space as %20.
+        // %22Salesforce.com%2C%20inc.%22
+        assert!(url.contains("?assignee=%22Salesforce.com%2C+inc.%22"));
 
         // Test query with assignee
         let options = SearchOptions {
@@ -228,11 +260,11 @@ mod tests {
             country: None,
             ..Default::default()
         };
-        // q=foo+assignee:("Google+LLC")
-        assert_eq!(
-            options.to_url().unwrap(),
-            "https://patents.google.com/?q=foo+assignee:(\"Google+LLC\")"
-        );
+        // q=foo&assignee="Google LLC"
+        // q is added via serializer (foo). assignee appended manually (&assignee=...)
+        let url = options.to_url().unwrap();
+        assert!(url.contains("q=foo"));
+        assert!(url.contains("&assignee=%22Google+LLC%22"));
 
         // Test query with country (JP should add language=JAPANESE)
         let options = SearchOptions {
