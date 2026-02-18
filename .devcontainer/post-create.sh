@@ -26,12 +26,6 @@ EOF
         echo "[Devcontainer Setup] Claude CLI already installed: $(claude --version)"
     fi
 
-    echo "[Devcontainer Setup] Checking project..."
-    cargo check
-
-    echo "[Devcontainer Setup] Installing google-patent-cli..."
-    cargo install --path . --force
-
     echo "[Devcontainer Setup] Configuring claude alias..."
     echo 'alias claude="claude --allow-dangerously-skip-permissions"' >> $HOME/.bashrc
     echo 'alias claude="claude --allow-dangerously-skip-permissions"' >> $HOME/.zshrc
