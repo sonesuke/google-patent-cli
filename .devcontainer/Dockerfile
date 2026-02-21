@@ -15,6 +15,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     ripgrep \
     tmux \
     vim \
+    jq \
     && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js LTS manually
@@ -29,3 +30,7 @@ ENV PATH=/usr/local/cargo/bin:$PATH
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash \
     && rustup component add rustfmt clippy llvm-tools-preview \
     && cargo binstall -y cargo-audit cargo-llvm-cov
+
+# Install mise
+RUN curl https://mise.run | sh \
+    && cp ~/.local/bin/mise /usr/local/bin/mise
