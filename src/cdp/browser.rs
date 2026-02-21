@@ -52,6 +52,8 @@ impl CdpBrowser {
         let mut cmd = Command::new(&chrome_path);
         cmd.arg("--remote-debugging-port=0"); // Let OS assign a random port
         cmd.arg(format!("--user-data-dir={}", temp_dir.display()));
+        cmd.arg("--password-store=basic"); // Prevent keychain prompts on macOS/Linux
+        cmd.arg("--no-first-run"); // Skip first run wizards
 
         if headless {
             cmd.arg("--headless");
