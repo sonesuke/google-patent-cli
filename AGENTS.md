@@ -47,4 +47,5 @@ mise.toml               # Task definitions (fmt, clippy, test, pre-commit)
 | `mise run fmt` | Check formatting with `cargo fmt` |
 | `mise run clippy` | Lint with `cargo clippy` |
 | `mise run test` | Run tests with `cargo test` |
+| `mise run coverage` | Generate test coverage report |
 | `mise run pre-commit` | Run all of the above |
