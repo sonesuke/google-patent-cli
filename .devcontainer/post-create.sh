@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 if [ -z "$CI" ] && [ -z "$GITHUB_ACTIONS" ]; then
     # Fix permissions for local development where CARGO_HOME is root-owned by the base image
@@ -10,21 +9,22 @@ if [ -z "$CI" ] && [ -z "$GITHUB_ACTIONS" ]; then
         echo "[Devcontainer Setup] Installing Claude CLI..."
         curl -fsSL https://claude.ai/install.sh | bash
 
-        echo "[Devcontainer Setup] Configuring tmux..."
-        cat > $HOME/.tmux.conf << 'EOF'
-# Display pane number
-bind-key p display-panes
-set display-panes-time 10000
-EOF
-
         # Add .local/bin to PATH for current session
         export PATH="$HOME/.local/bin:$PATH"
+
         # Add to shell configs for future sessions
         echo 'export PATH="$HOME/.local/bin:$PATH"' >> $HOME/.bashrc
         echo 'export PATH="$HOME/.local/bin:$PATH"' >> $HOME/.zshrc
     else
         echo "[Devcontainer Setup] Claude CLI already installed: $(claude --version)"
     fi
+
+    echo "[Devcontainer Setup] Configuring tmux..."
+    cat > $HOME/.tmux.conf << 'EOF'
+# Display pane number
+bind-key p display-panes
+set display-panes-time 10000
+EOF
 
     echo "[Devcontainer Setup] Configuring claude alias..."
     echo 'alias claude="claude --allow-dangerously-skip-permissions"' >> $HOME/.bashrc

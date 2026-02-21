@@ -1,5 +1,5 @@
 {
-    "name": "Google Patent CLI Dev",
+    "name": "Google-Patent-CLI Dev",
     "build": {
         "dockerfile": "Dockerfile",
         "context": ".."
