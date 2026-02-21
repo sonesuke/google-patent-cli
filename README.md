@@ -17,38 +17,17 @@ A Rust‑based command‑line tool for extracting structured data from Google Pa
 
 ## Installation
 
-### Option 1: Download Pre-built Binaries (Recommended)
-
-Download the latest release for your platform from the [Releases page](https://github.com/sonesuke/google-patent-cli/releases):
-
-**Linux (x86_64):**
+### macOS / Linux (one-liner)
 ```bash
-curl -LO https://github.com/sonesuke/google-patent-cli/releases/latest/download/google-patent-cli-linux-x86_64.tar.gz
-tar xzf google-patent-cli-linux-x86_64.tar.gz
-sudo mv google-patent-cli /usr/local/bin/
+curl -fsSL https://raw.githubusercontent.com/sonesuke/google-patent-cli/main/install.sh | bash
 ```
 
-**macOS (Intel):**
-```bash
-curl -LO https://github.com/sonesuke/google-patent-cli/releases/latest/download/google-patent-cli-macos-x86_64.tar.gz
-tar xzf google-patent-cli-macos-x86_64.tar.gz
-sudo mv google-patent-cli /usr/local/bin/
+### Windows (PowerShell)
+```powershell
+irm https://raw.githubusercontent.com/sonesuke/google-patent-cli/main/install.ps1 | iex
 ```
 
-**macOS (Apple Silicon):**
-```bash
-curl -LO https://github.com/sonesuke/google-patent-cli/releases/latest/download/google-patent-cli-macos-arm64.tar.gz
-tar xzf google-patent-cli-macos-arm64.tar.gz
-sudo mv google-patent-cli /usr/local/bin/
-```
-
-**Windows:**
-1. Download `google-patent-cli-windows-x86_64.zip` from the [Releases page](https://github.com/sonesuke/google-patent-cli/releases)
-2. Extract the ZIP file
-3. Add the extracted `google-patent-cli.exe` to your PATH
-
-### Option 2: Build from Source
-
+### Build from Source
 ```bash
 cargo install --path .
 ```
