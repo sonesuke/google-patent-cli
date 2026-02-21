@@ -119,6 +119,7 @@ impl CdpBrowser {
             }
         });
 
+        let stderr_path_for_error = stderr_file.clone();
         // Wait for the port to be discovered (up to 10 seconds)
         let discovered_port = tokio::task::spawn_blocking(move || {
             for _ in 0..100 {
@@ -129,7 +130,15 @@ impl CdpBrowser {
                 }
                 std::thread::sleep(Duration::from_millis(100));
             }
-            Err(Error::Browser("Failed to discover Chrome debugging port".to_string()))
+            let err_msg = match std::fs::read_to_string(&stderr_path_for_error) {
+                Ok(content) => {
+                    format!("Failed to discover Chrome debugging port. Chrome stderr:\n{}", content)
+                }
+                Err(_) => {
+                    "Failed to discover Chrome debugging port. Could not read stderr.".to_string()
+                }
+            };
+            Err(Error::Browser(err_msg))
         })
         .await
         .map_err(|e| Error::Browser(format!("Task failed: {}", e)))??;
