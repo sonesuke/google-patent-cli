@@ -1,4 +1,4 @@
-use crate::core::cdp::{CdpBrowser, CdpPage};
+use crate::core::cdp::{BrowserManager, CdpPage};
 use crate::core::models::{Patent, SearchOptions, SearchResult};
 use crate::core::{Error, Result};
 use async_trait::async_trait;
@@ -10,7 +10,7 @@ pub trait PatentSearch: Send + Sync {
 }
 
 pub struct PatentSearcher {
-    browser: CdpBrowser,
+    browser_manager: BrowserManager,
 }
 
 #[async_trait]
@@ -26,7 +26,8 @@ impl PatentSearch for PatentSearcher {
             || format!("https://patents.google.com/patent/{}", patent_number),
             |lang| format!("https://patents.google.com/patent/{}?hl={}", patent_number, lang),
         );
-        let page_ws_url = self.browser.new_page().await?;
+        let browser = self.browser_manager.get_browser().await?;
+        let page_ws_url = browser.new_page().await?;
         let page = CdpPage::new(&page_ws_url).await?;
 
         page.goto(&url).await?;
@@ -45,7 +46,9 @@ impl PatentSearch for PatentSearcher {
             )
             .await?;
 
-        page.get_html().await
+        let html = page.get_html().await;
+        let _ = page.close().await;
+        html
     }
 }
 
@@ -55,24 +58,14 @@ impl PatentSearcher {
         headless: bool,
         debug: bool,
     ) -> Result<Self> {
-        let mut args = vec!["--disable-blink-features=AutomationControlled"];
+        let browser_manager = BrowserManager::new(browser_path, headless, debug);
 
-        // Add stability flags for CI/Container environments
-        if std::env::var("CI").is_ok() {
-            args.extend_from_slice(&[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-gpu",
-                "--disable-dev-shm-usage",
-            ]);
-        }
-        let browser = CdpBrowser::launch(browser_path, args, headless, debug).await?;
-
-        Ok(Self { browser })
+        Ok(Self { browser_manager })
     }
 
     async fn search_internal(&self, options: &SearchOptions) -> Result<SearchResult> {
-        let page_ws_url = self.browser.new_page().await?;
+        let browser = self.browser_manager.get_browser().await?;
+        let page_ws_url = browser.new_page().await?;
         let page = CdpPage::new(&page_ws_url).await?;
 
         let base_url = options.to_url()?;
@@ -104,6 +97,8 @@ impl PatentSearcher {
 
             // For single patent, total_results is "1".
             let patents = parse_single_patent_result(result, patent_number, base_url)?;
+            let _ = page.close().await;
+
             Ok(SearchResult {
                 total_results: "1".to_string(),
                 top_assignees: None,
@@ -143,6 +138,7 @@ impl PatentSearcher {
                 let loaded = page.wait_for_element(".search-result-item", 15).await?;
                 if !loaded {
                     // No results on this page, stop pagination
+                    let _ = page.close().await;
                     break;
                 }
 
@@ -178,6 +174,7 @@ impl PatentSearcher {
                     break;
                 }
             }
+            let _ = page.close().await;
 
             // Truncate to exact limit
             if all_patents.len() > limit {
