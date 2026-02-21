@@ -34,7 +34,12 @@ fn test_fetch_help() {
 
 #[test]
 fn test_config_shows_current() {
+    let temp_dir = tempfile::tempdir().unwrap();
     cargo_bin_cmd!("google-patent-cli")
+        .env("HOME", temp_dir.path())
+        .env("XDG_CONFIG_HOME", temp_dir.path())
+        .env("APPDATA", temp_dir.path())
+        .env("USERPROFILE", temp_dir.path())
         .args(["config"])
         .assert()
         .success()
@@ -82,7 +87,6 @@ fn test_raw_flag_exists() {
 // We use small limits and specific IDs to keep them fast.
 
 #[test]
-#[ignore = "requires network and browser"]
 fn test_search_execution() {
     cargo_bin_cmd!("google-patent-cli")
         .args(["search", "--query", "machine learning", "--limit", "1"])
@@ -94,7 +98,6 @@ fn test_search_execution() {
 }
 
 #[test]
-#[ignore = "requires network and browser"]
 fn test_fetch_execution() {
     cargo_bin_cmd!("google-patent-cli")
         .args(["fetch", "US9152718B2"])
@@ -105,7 +108,6 @@ fn test_fetch_execution() {
 }
 
 #[test]
-#[ignore = "requires network and browser"]
 fn test_fetch_raw_execution() {
     cargo_bin_cmd!("google-patent-cli")
         .args(["fetch", "US9152718B2", "--raw"])
