@@ -22,7 +22,7 @@ Google Patent CLI — A Rust-based command-line tool for searching and fetching 
 
 ### Language
 
-- Code comments, commit messages, and **Pull Requests**: **English**
+- Code comments, commit messages, **Pull Requests**, and **Artifacts** (Implementation Plans, Walkthroughs, Tasks): **English**
 - Responses to the user: **日本語**
 
 ## Project Structure
