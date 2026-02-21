@@ -1,45 +1,28 @@
 use anyhow::Result;
+use async_trait::async_trait;
 
 use crate::cdp::{CdpBrowser, CdpPage};
 use crate::models::{Patent, SearchOptions, SearchResult};
+
+#[async_trait]
+pub trait PatentSearch: Send + Sync {
+    async fn search(&self, options: &SearchOptions) -> Result<SearchResult>;
+    async fn get_raw_html(&self, patent_number: &str, language: Option<&str>) -> Result<String>;
+}
 
 pub struct PatentSearcher {
     browser: CdpBrowser,
 }
 
-impl PatentSearcher {
-    pub async fn new(
-        browser_path: Option<std::path::PathBuf>,
-        headless: bool,
-        debug: bool,
-    ) -> Result<Self> {
-        let mut args = vec!["--disable-blink-features=AutomationControlled"];
-
-        // Add stability flags for CI/Container environments
-        if std::env::var("CI").is_ok() {
-            args.extend_from_slice(&[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-gpu",
-                "--disable-dev-shm-usage",
-            ]);
-        }
-        let browser = CdpBrowser::launch(browser_path, args, headless, debug).await?;
-
-        Ok(Self { browser })
-    }
-
+#[async_trait]
+impl PatentSearch for PatentSearcher {
     /// Search for patents or fetch a specific patent
-    pub async fn search(&self, options: &SearchOptions) -> Result<SearchResult> {
+    async fn search(&self, options: &SearchOptions) -> Result<SearchResult> {
         self.search_internal(options).await
     }
 
     /// Get raw HTML for a patent page (for debugging)
-    pub async fn get_raw_html(
-        &self,
-        patent_number: &str,
-        language: Option<&str>,
-    ) -> Result<String> {
+    async fn get_raw_html(&self, patent_number: &str, language: Option<&str>) -> Result<String> {
         let url = language.map_or_else(
             || format!("https://patents.google.com/patent/{}", patent_number),
             |lang| format!("https://patents.google.com/patent/{}?hl={}", patent_number, lang),
@@ -64,6 +47,29 @@ impl PatentSearcher {
             .await?;
 
         page.get_html().await
+    }
+}
+
+impl PatentSearcher {
+    pub async fn new(
+        browser_path: Option<std::path::PathBuf>,
+        headless: bool,
+        debug: bool,
+    ) -> Result<Self> {
+        let mut args = vec!["--disable-blink-features=AutomationControlled"];
+
+        // Add stability flags for CI/Container environments
+        if std::env::var("CI").is_ok() {
+            args.extend_from_slice(&[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+            ]);
+        }
+        let browser = CdpBrowser::launch(browser_path, args, headless, debug).await?;
+
+        Ok(Self { browser })
     }
 
     async fn search_internal(&self, options: &SearchOptions) -> Result<SearchResult> {

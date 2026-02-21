@@ -26,6 +26,7 @@ mod mcp;
 mod models;
 mod patent_search;
 
+use crate::patent_search::PatentSearch;
 use config::Config;
 use models::SearchOptions;
 use patent_search::PatentSearcher;
@@ -132,7 +133,10 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    run_app(cli).await
+}
 
+async fn run_app(cli: Cli) -> Result<()> {
     match cli.command {
         Commands::Mcp => {
             mcp::run().await?;
@@ -202,4 +206,75 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cli_parsing() {
+        let cli = Cli::try_parse_from(["google-patent-cli", "search", "--query", "test"]);
+        assert!(cli.is_ok());
+
+        let cli = Cli::try_parse_from(["google-patent-cli", "fetch", "US123"]);
+        assert!(cli.is_ok());
+
+        let cli = Cli::try_parse_from([
+            "google-patent-cli",
+            "config",
+            "--set-browser",
+            "/path/to/browser",
+        ]);
+        assert!(cli.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_run_app_config_list() {
+        // This will print to stdout, but we can check if it returns Ok
+        let cli = Cli::try_parse_from(["google-patent-cli", "config"])
+            .expect("Cli parsing success in test");
+        let res = run_app(cli).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_run_app_search_no_args() {
+        let cli = Cli::try_parse_from(["google-patent-cli", "search"])
+            .expect("Cli parsing success in test");
+        let res = run_app(cli).await;
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "At least one of --query or --assignee must be provided."
+        );
+    }
+
+    #[tokio::test]
+    async fn test_run_app_config_set() {
+        let temp_dir = tempfile::tempdir().expect("Cli parsing success in test");
+        let browser_path = temp_dir.path().join("browser");
+        let cli = Cli::try_parse_from([
+            "google-patent-cli",
+            "config",
+            "--set-browser",
+            browser_path.to_str().expect("Valid UTF-8 path"),
+        ])
+        .expect("Cli parsing success in test");
+
+        // This will create a file in the default config location unless we isolate it.
+        // Wait, Config::load() uses directories crate.
+        // To isolate, we should ideally use env vars.
+        std::env::set_var("HOME", temp_dir.path());
+        std::env::set_var("XDG_CONFIG_HOME", temp_dir.path());
+        std::env::set_var("APPDATA", temp_dir.path());
+        std::env::set_var("USERPROFILE", temp_dir.path());
+
+        let res = run_app(cli).await;
+        assert!(res.is_ok());
+
+        let config = Config::load().expect("Failed to load config");
+        assert_eq!(config.browser_path, Some(browser_path));
+    }
 }
