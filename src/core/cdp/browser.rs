@@ -1,9 +1,8 @@
 use crate::core::{Error, Result};
 use serde_json::Value;
-use std::io::BufReader;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
@@ -75,34 +74,29 @@ impl CdpBrowser {
         cmd.stdout(Stdio::null());
         cmd.stderr(Stdio::from(stderr_handle));
 
-        let process = cmd.spawn()?;
+        let process = Arc::new(std::sync::Mutex::new(cmd.spawn()?));
 
         // Read the port from the stderr file
-        let port = Arc::new(StdMutex::new(None::<u16>));
+        let port: Arc<std::sync::Mutex<Option<u16>>> = Arc::new(std::sync::Mutex::new(None));
         let port_clone = port.clone();
         let stderr_path = stderr_file.clone();
         let debug_flag = debug;
 
-        // Spawn a thread to read the file and extract the port
-        std::thread::spawn(move || {
-            let file = match std::fs::File::open(&stderr_path) {
-                Ok(f) => f,
-                Err(_) => return,
-            };
-            let _reader = BufReader::new(file);
+        if debug_flag {
+            eprintln!("Launching Chrome: {:?}", cmd);
+        }
 
-            // Poll the file for the port message
-            for _ in 0..100 {
-                // Try for 10 seconds
-                // We need to re-open or seek to read new content, but simple polling works for now
-                // Actually, let's just read the whole file each time since it's small
+        // Spawn a thread to read stderr and look for the port
+        tokio::spawn(async move {
+            let start = std::time::Instant::now();
+            // Try for up to 10 seconds
+            while start.elapsed().as_secs() < 10 {
                 if let Ok(content) = std::fs::read_to_string(&stderr_path) {
                     for line in content.lines() {
-                        if debug_flag && line.contains("DevTools listening on") {
-                            eprintln!("Chrome: {}", line);
+                        if debug_flag {
+                            eprintln!("CHROME STDERR: {}", line);
                         }
-
-                        if line.contains("DevTools listening on") {
+                        if line.contains("DevTools listening on ws://127.0.0.1:") {
                             if let Some(port_str) = line.split("127.0.0.1:").nth(1) {
                                 if let Some(port_num) = port_str.split('/').next() {
                                     if let Ok(p) = port_num.parse::<u16>() {
@@ -121,6 +115,7 @@ impl CdpBrowser {
         });
 
         let stderr_path_for_error = stderr_file.clone();
+        let process_ext = process.clone();
         // Wait for the port to be discovered (up to 10 seconds)
         let discovered_port = tokio::task::spawn_blocking(move || {
             for _ in 0..100 {
@@ -131,7 +126,10 @@ impl CdpBrowser {
                 }
                 std::thread::sleep(Duration::from_millis(100));
             }
-            let err_msg = match std::fs::read_to_string(&stderr_path_for_error) {
+            let mut process_guard = process_ext.lock().unwrap();
+            let exit_status = process_guard.try_wait().unwrap_or(None);
+
+            let mut err_msg = match std::fs::read_to_string(&stderr_path_for_error) {
                 Ok(content) => {
                     format!("Failed to discover Chrome debugging port. Chrome stderr:\n{}", content)
                 }
@@ -139,15 +137,29 @@ impl CdpBrowser {
                     "Failed to discover Chrome debugging port. Could not read stderr.".to_string()
                 }
             };
+
+            if let Some(status) = exit_status {
+                err_msg =
+                    format!("{}\nChrome process exited early with status: {}", err_msg, status);
+            } else {
+                err_msg =
+                    format!("{}\nChrome process is still running but port was not found.", err_msg);
+            }
+
             Err(Error::Browser(err_msg))
         })
         .await
         .map_err(|e| Error::Browser(format!("Task failed: {}", e)))??;
 
-        // Wait for Chrome to start and expose the debugging port
-        // Retry get_ws_url with backoff instead of fixed sleep
         let ws_url =
             Self::get_ws_url_with_retry(discovered_port, 10, Duration::from_millis(500)).await?;
+
+        let process = match Arc::try_unwrap(process) {
+            Ok(mutex) => mutex.into_inner().unwrap(),
+            Err(_) => {
+                return Err(Error::Browser("Failed to acquire process ownership".to_string()))
+            }
+        };
 
         Ok(Self { process: Some(process), port: discovered_port, ws_url })
     }
