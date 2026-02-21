@@ -75,6 +75,10 @@ impl ServerHandler for PatentHandler {
                                 "limit": {
                                     "type": "number",
                                     "description": "Maximum number of results to return"
+                                },
+                                "language": {
+                                    "type": "string",
+                                    "description": "Language/locale for patent pages (e.g., 'ja', 'en', 'zh')"
                                 }
                             })),
                             required: None,
@@ -93,6 +97,10 @@ impl ServerHandler for PatentHandler {
                                 "raw": {
                                     "type": "boolean",
                                     "description": "If true, returns the raw HTML of the patent page"
+                                },
+                                "language": {
+                                    "type": "string",
+                                    "description": "Language/locale for patent pages (e.g., 'ja', 'en', 'zh')"
                                 }
                             })),
                             required: Some(vec!["patent_id".to_string()]),
@@ -143,6 +151,10 @@ impl ServerHandler for PatentHandler {
                             arguments.get("before").and_then(|v| v.as_str()).map(|s| s.to_string());
                         let limit =
                             arguments.get("limit").and_then(|v| v.as_u64()).map(|n| n as usize);
+                        let language = arguments
+                            .get("language")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
 
                         let options = SearchOptions {
                             query,
@@ -152,6 +164,7 @@ impl ServerHandler for PatentHandler {
                             after_date: after,
                             before_date: before,
                             limit,
+                            language,
                         };
 
                         let result = match self.searcher.search(&options).await {
@@ -175,9 +188,10 @@ impl ServerHandler for PatentHandler {
                         let patent_id =
                             arguments.get("patent_id").and_then(|v| v.as_str()).unwrap_or_default();
                         let raw = arguments.get("raw").and_then(|v| v.as_bool()).unwrap_or(false);
+                        let language = arguments.get("language").and_then(|v| v.as_str());
 
                         let result = if raw {
-                            match self.searcher.get_raw_html(patent_id).await {
+                            match self.searcher.get_raw_html(patent_id, language).await {
                                 Ok(html) => ToolResult {
                                     content: vec![MessageContent::Text { text: html }],
                                     structured_content: None,
@@ -198,6 +212,7 @@ impl ServerHandler for PatentHandler {
                                 after_date: None,
                                 before_date: None,
                                 limit: None,
+                                language: language.map(|s| s.to_string()),
                             };
                             match self.searcher.search(&options).await {
                                 Ok(mut results) => results.patents.pop().map_or_else(

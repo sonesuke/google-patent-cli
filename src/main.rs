@@ -79,6 +79,10 @@ struct SearchArgs {
     /// Enable debug output (shows Chrome logs)
     #[arg(long, default_value_t = false)]
     debug: bool,
+
+    /// Language/locale for patent pages (e.g., ja, en, zh)
+    #[arg(long)]
+    language: Option<String>,
 }
 
 #[derive(clap::Args, Debug)]
@@ -97,6 +101,10 @@ struct FetchArgs {
     /// Enable debug output (shows Chrome logs)
     #[arg(long, default_value_t = false)]
     debug: bool,
+
+    /// Language/locale for patent pages (e.g., ja, en, zh)
+    #[arg(long)]
+    language: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -156,6 +164,7 @@ async fn main() -> Result<()> {
                 after_date: args.after,
                 before_date: args.before,
                 limit: args.limit,
+                language: args.language,
             };
 
             let results = searcher.search(&options).await?;
@@ -167,7 +176,7 @@ async fn main() -> Result<()> {
             let searcher = PatentSearcher::new(config.browser_path, !args.head, args.debug).await?;
 
             if args.raw {
-                let html = searcher.get_raw_html(&args.patent_id).await?;
+                let html = searcher.get_raw_html(&args.patent_id, args.language.as_deref()).await?;
                 println!("{}", html);
             } else {
                 let options = SearchOptions {
@@ -178,6 +187,7 @@ async fn main() -> Result<()> {
                     after_date: None,
                     before_date: None,
                     limit: None,
+                    language: args.language,
                 };
                 let mut results = searcher.search(&options).await?;
                 if let Some(patent) = results.patents.pop() {

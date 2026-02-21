@@ -6,10 +6,13 @@ A Rust‑based command‑line tool for extracting structured data from Google Pa
 - Search patents by free‑text query
 - Retrieve a single patent by number
 - Filter results by priority date (`--before` / `--after`)
+- Filter by country (`--country JP`)
+- **Language/locale support** (`--language ja`) for translated patent pages
 - Output JSON with full structured fields (`description_paragraphs`, `claims`, `images`)
 - Optional `--raw` flag to output the raw HTML for debugging
 - **Headless mode is the default**; use `--head` to show the Chrome window
 - Custom CDP (Chrome DevTools Protocol) implementation for robust browser control
+- **MCP (Model Context Protocol) server** for AI agent integration
 - Simple configuration for custom Chrome/Chromium executable path
 
 ## Installation
@@ -73,7 +76,6 @@ google-patent-cli search --query "machine learning" --assignee "Google"
 google-patent-cli search --query "AI" --after "2020-01-01"
 
 # Patents filed between 2018‑01‑01 and 2020‑12‑31
-# Patents filed between 2018‑01‑01 and 2020‑12‑31
 google-patent-cli search --query "blockchain" --after "2018-01-01" --before "2020-12-31"
 ```
 
@@ -93,6 +95,25 @@ The `--raw` flag disables the structured JSON extraction and prints the full HTM
 ```bash
 google-patent-cli fetch "US20220319181A1" --raw
 ```
+
+### Language/locale
+```bash
+# Fetch patent page in Japanese
+google-patent-cli fetch US9152718B2 --language ja
+
+# Search with Japanese locale
+google-patent-cli search --query "machine learning" --language ja
+```
+
+### MCP server
+Start the MCP server for AI agent integration:
+```bash
+google-patent-cli mcp
+```
+
+The MCP server exposes two tools:
+- `search_patents` — Search Google Patents with query, assignee, country, date, and language filters
+- `fetch_patent` — Fetch a specific patent by ID (JSON or raw HTML)
 
 ## Configuration
 The CLI stores a simple TOML config file at `~/.config/google-patent-cli/config.toml`. The tool automatically detects the default Chrome installation path for your OS. To set a custom Chrome/Chromium executable path (useful on non‑standard installations):
