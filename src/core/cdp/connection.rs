@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use crate::core::{Error, Result};
 use futures::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-type Responder = oneshot::Sender<Result<Value>>;
+type Responder = oneshot::Sender<std::result::Result<Value, Error>>;
 
 /// CDP connection managing WebSocket communication
 pub struct CdpConnection {
@@ -55,10 +55,10 @@ impl CdpConnection {
                                 let responder = pending.lock().await.remove(&id);
                                 if let Some(responder) = responder {
                                     if let Some(error) = v.get("error") {
-                                        let _ = responder.send(Err(anyhow!(
+                                        let _ = responder.send(Err(Error::Browser(format!(
                                             "CDP error: {}",
                                             error["message"].as_str().unwrap_or("unknown")
-                                        )));
+                                        ))));
                                     } else if let Some(result) = v.get("result") {
                                         let _ = responder.send(Ok(result.clone()));
                                     }
@@ -92,8 +92,8 @@ impl CdpConnection {
         let (tx, rx) = oneshot::channel();
         self.command_tx
             .send((id, method.to_string(), params, tx))
-            .map_err(|_| anyhow!("Failed to send command"))?;
+            .map_err(|_| Error::Browser("Failed to send command".to_string()))?;
 
-        rx.await.map_err(|_| anyhow!("Response channel closed"))?
+        rx.await.map_err(|_| Error::Browser("Response channel closed".to_string()))?
     }
 }

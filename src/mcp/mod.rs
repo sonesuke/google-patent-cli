@@ -1,6 +1,6 @@
-use crate::config::Config;
-use crate::models::SearchOptions;
-use crate::patent_search::{PatentSearch, PatentSearcher};
+use crate::core::config::Config;
+use crate::core::models::SearchOptions;
+use crate::core::patent_search::{PatentSearch, PatentSearcher};
 use anyhow::Result;
 use async_trait::async_trait;
 use mcp_sdk_rs::server::{Server, ServerHandler};
@@ -287,17 +287,17 @@ pub async fn run() -> anyhow::Result<()> {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::models::{Patent, SearchOptions, SearchResult};
+    use crate::core::models::{Patent, SearchOptions, SearchResult};
     use mcp_sdk_rs::types::MessageContent;
 
     struct MockSearcher;
 
     #[async_trait]
     impl PatentSearch for MockSearcher {
-        async fn search(&self, options: &SearchOptions) -> Result<SearchResult> {
+        async fn search(&self, options: &SearchOptions) -> crate::core::Result<SearchResult> {
             if let Some(pn) = &options.patent_number {
                 if pn == "FAIL" {
-                    return Err(anyhow::anyhow!("Mock failure"));
+                    return Err(crate::core::Error::Other("Mock failure".to_string()));
                 }
                 if pn == "NONE" {
                     return Ok(SearchResult {
@@ -334,9 +334,9 @@ mod tests {
             &self,
             patent_number: &str,
             _language: Option<&str>,
-        ) -> Result<String> {
+        ) -> crate::core::Result<String> {
             if patent_number == "FAIL" {
-                return Err(anyhow::anyhow!("Mock failure"));
+                return Err(crate::core::Error::Other("Mock failure".to_string()));
             }
             Ok(format!("<html>{}</html>", patent_number))
         }

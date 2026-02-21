@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use crate::core::{Error, Result};
 use serde_json::{json, Value};
 use std::time::Duration;
 use tokio::time::sleep;
@@ -51,7 +51,10 @@ impl CdpPage {
     pub async fn get_html(&self) -> Result<String> {
         let script = "document.documentElement.outerHTML";
         let result = self.evaluate(script).await?;
-        result.as_str().map(String::from).ok_or_else(|| anyhow!("Failed to get HTML"))
+        result
+            .as_str()
+            .map(String::from)
+            .ok_or_else(|| Error::Browser("Failed to get HTML".to_string()))
     }
 
     /// Evaluate JavaScript and return the result
@@ -69,7 +72,7 @@ impl CdpPage {
             .await?;
 
         if let Some(exception) = result.get("exceptionDetails") {
-            return Err(anyhow!("JavaScript error: {:?}", exception));
+            return Err(Error::Browser(format!("JavaScript error: {:?}", exception)));
         }
 
         Ok(result["result"]["value"].clone())
