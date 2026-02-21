@@ -35,8 +35,15 @@ impl PatentSearcher {
     }
 
     /// Get raw HTML for a patent page (for debugging)
-    pub async fn get_raw_html(&self, patent_number: &str) -> Result<String> {
-        let url = format!("https://patents.google.com/patent/{}", patent_number);
+    pub async fn get_raw_html(
+        &self,
+        patent_number: &str,
+        language: Option<&str>,
+    ) -> Result<String> {
+        let url = language.map_or_else(
+            || format!("https://patents.google.com/patent/{}", patent_number),
+            |lang| format!("https://patents.google.com/patent/{}?hl={}", patent_number, lang),
+        );
         let page_ws_url = self.browser.new_page().await?;
         let page = CdpPage::new(&page_ws_url).await?;
 

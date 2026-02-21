@@ -91,12 +91,19 @@ pub struct SearchOptions {
     pub after_date: Option<String>,
     pub before_date: Option<String>,
     pub limit: Option<usize>,
+    /// Language/locale for the patent page (e.g., "ja", "en", "zh")
+    pub language: Option<String>,
 }
 
 impl SearchOptions {
     pub fn to_url(&self) -> anyhow::Result<String> {
         if let Some(patent_number) = &self.patent_number {
-            return Ok(format!("https://patents.google.com/patent/{}", patent_number));
+            return self.language.as_ref().map_or_else(
+                || Ok(format!("https://patents.google.com/patent/{}", patent_number)),
+                |lang| {
+                    Ok(format!("https://patents.google.com/patent/{}?hl={}", patent_number, lang))
+                },
+            );
         }
 
         let mut url = Url::parse("https://patents.google.com/")?;
@@ -136,6 +143,10 @@ impl SearchOptions {
 
             if let Some(before) = &self.before_date {
                 serializer.append_pair("before", before);
+            }
+
+            if let Some(language) = &self.language {
+                serializer.append_pair("hl", language);
             }
         }
 
@@ -199,12 +210,8 @@ mod tests {
     fn test_search_options_creation() {
         let options = SearchOptions {
             query: Some("test".to_string()),
-            assignee: None,
-            country: None,
-            patent_number: None,
-            after_date: None,
-            before_date: None,
             limit: Some(10),
+            ..Default::default()
         };
 
         assert_eq!(options.query.as_deref(), Some("test"));
@@ -311,5 +318,36 @@ mod tests {
         // Test error
         let options = SearchOptions::default();
         assert!(options.to_url().is_err());
+
+        // Test patent with language (hl parameter)
+        let options = SearchOptions {
+            patent_number: Some("US9152718B2".to_string()),
+            language: Some("ja".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            options.to_url().unwrap(),
+            "https://patents.google.com/patent/US9152718B2?hl=ja"
+        );
+
+        // Test search with language
+        let options = SearchOptions {
+            query: Some("foo".to_string()),
+            language: Some("ja".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo&hl=ja");
+
+        // Test search with country and explicit language override
+        let options = SearchOptions {
+            query: Some("foo".to_string()),
+            country: Some("JP".to_string()),
+            language: Some("en".to_string()),
+            ..Default::default()
+        };
+        let url = options.to_url().unwrap();
+        assert!(url.contains("country=JP"));
+        assert!(url.contains("language=JAPANESE"));
+        assert!(url.contains("hl=en"));
     }
 }
