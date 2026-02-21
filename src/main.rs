@@ -22,6 +22,7 @@ use std::path::PathBuf;
 
 mod cdp;
 mod config;
+mod mcp;
 mod models;
 mod patent_search;
 
@@ -116,6 +117,8 @@ enum Commands {
         #[arg(long)]
         set_browser: Option<PathBuf>,
     },
+    /// Start MCP server
+    Mcp,
 }
 
 #[tokio::main]
@@ -123,6 +126,9 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Mcp => {
+            mcp::run().await?;
+        }
         Commands::Config { set_browser } => {
             let mut config = Config::load()?;
             if let Some(path) = set_browser {
