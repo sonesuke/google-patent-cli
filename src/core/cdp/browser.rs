@@ -3,8 +3,9 @@ use serde_json::Value;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::sync::{Arc, Mutex as StdMutex};
+use std::time::{Duration, Instant};
+use tokio::sync::Mutex;
 use tokio::time::sleep;
 
 /// Chrome browser process manager
@@ -77,7 +78,7 @@ impl CdpBrowser {
         let process = cmd.spawn()?;
 
         // Read the port from the stderr file
-        let port = Arc::new(Mutex::new(None::<u16>));
+        let port = Arc::new(StdMutex::new(None::<u16>));
         let port_clone = port.clone();
         let stderr_path = stderr_file.clone();
         let debug_flag = debug;
@@ -215,5 +216,64 @@ impl Drop for CdpBrowser {
         if let Some(mut process) = self.process.take() {
             let _ = process.kill();
         }
+    }
+}
+
+pub struct BrowserState {
+    pub browser: Option<Arc<CdpBrowser>>,
+    pub last_used: Instant,
+}
+
+#[derive(Clone)]
+pub struct BrowserManager {
+    browser_path: Option<PathBuf>,
+    headless: bool,
+    debug: bool,
+    state: Arc<Mutex<BrowserState>>,
+}
+
+impl BrowserManager {
+    pub fn new(browser_path: Option<PathBuf>, headless: bool, debug: bool) -> Self {
+        let state = Arc::new(Mutex::new(BrowserState { browser: None, last_used: Instant::now() }));
+
+        // Spawn the inactivity monitor task
+        let state_clone = state.clone();
+        tokio::spawn(async move {
+            loop {
+                sleep(Duration::from_secs(60)).await;
+                let mut s = state_clone.lock().await;
+                if s.browser.is_some() && s.last_used.elapsed() > Duration::from_secs(5 * 60) {
+                    s.browser = None; // Drops Arc<CdpBrowser>, which triggers process kill
+                }
+            }
+        });
+
+        Self { browser_path, headless, debug, state }
+    }
+
+    pub async fn get_browser(&self) -> Result<Arc<CdpBrowser>> {
+        let mut s = self.state.lock().await;
+        s.last_used = Instant::now();
+
+        if let Some(browser) = &s.browser {
+            return Ok(Arc::clone(browser));
+        }
+
+        let mut args = vec![
+            "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "--disable-blink-features=AutomationControlled",
+        ];
+
+        if std::env::var("CI").is_ok() {
+            args.push("--disable-gpu");
+        }
+
+        let browser_path = self.browser_path.clone();
+
+        let browser =
+            Arc::new(CdpBrowser::launch(browser_path, args, self.headless, self.debug).await?);
+        s.browser = Some(Arc::clone(&browser));
+
+        Ok(browser)
     }
 }
