@@ -1,8 +1,7 @@
-use anyhow::Result;
+use crate::core::cdp::{CdpBrowser, CdpPage};
+use crate::core::models::{Patent, SearchOptions, SearchResult};
+use crate::core::{Error, Result};
 use async_trait::async_trait;
-
-use crate::cdp::{CdpBrowser, CdpPage};
-use crate::models::{Patent, SearchOptions, SearchResult};
 
 #[async_trait]
 pub trait PatentSearch: Send + Sync {
@@ -36,7 +35,7 @@ impl PatentSearch for PatentSearcher {
         let loaded =
             page.wait_for_element("meta[name='description'], meta[name='DC.title']", 15).await?;
         if !loaded {
-            return Err(anyhow::anyhow!("Page failed to load within timeout"));
+            return Err(Error::Search("Page failed to load within timeout".to_string()));
         }
         // Additional wait for description paragraphs, claims, and images to appear
         let _ = page
@@ -87,7 +86,7 @@ impl PatentSearcher {
                 .wait_for_element("meta[name='description'], meta[name='DC.title']", 15)
                 .await?;
             if !loaded {
-                return Err(anyhow::anyhow!("Page failed to load within timeout"));
+                return Err(Error::Search("Page failed to load within timeout".to_string()));
             }
             // Additional wait for description paragraphs, claims, and images to appear
             let _ = page
@@ -116,8 +115,8 @@ impl PatentSearcher {
             let mut all_patents: Vec<Patent> = Vec::new();
             let limit = options.limit.unwrap_or(10);
             let mut total_results_str = "Unknown".to_string();
-            let mut top_assignees: Option<Vec<crate::models::SummaryItem>> = None;
-            let mut top_cpcs: Option<Vec<crate::models::SummaryItem>> = None;
+            let mut top_assignees: Option<Vec<crate::core::models::SummaryItem>> = None;
+            let mut top_cpcs: Option<Vec<crate::core::models::SummaryItem>> = None;
 
             // Append num=100 to base_url to fetch more results per page if needed
             // This reduces the need for multiple page loads for limits <= 100
@@ -205,10 +204,10 @@ fn parse_single_patent_result(
 
     // Parse description paragraphs
     let description_paragraphs = result["description_paragraphs"].as_array().and_then(|paras| {
-        let parsed: Vec<crate::models::DescriptionParagraph> = paras
+        let parsed: Vec<crate::core::models::DescriptionParagraph> = paras
             .iter()
             .filter_map(|p| {
-                Some(crate::models::DescriptionParagraph {
+                Some(crate::core::models::DescriptionParagraph {
                     number: p["number"].as_str()?.to_string(),
                     id: p["id"].as_str()?.to_string(),
                     text: p["text"].as_str()?.to_string(),
@@ -224,10 +223,10 @@ fn parse_single_patent_result(
 
     // Parse claims
     let claims = result["claims"].as_array().and_then(|claims_arr| {
-        let parsed: Vec<crate::models::Claim> = claims_arr
+        let parsed: Vec<crate::core::models::Claim> = claims_arr
             .iter()
             .filter_map(|c| {
-                Some(crate::models::Claim {
+                Some(crate::core::models::Claim {
                     number: c["number"].as_str()?.to_string(),
                     id: c["id"].as_str()?.to_string(),
                     text: c["text"].as_str()?.to_string(),
@@ -243,10 +242,10 @@ fn parse_single_patent_result(
 
     // Parse images
     let images = result["images"].as_array().and_then(|imgs| {
-        let parsed: Vec<crate::models::PatentImage> = imgs
+        let parsed: Vec<crate::core::models::PatentImage> = imgs
             .iter()
             .filter_map(|img| {
-                Some(crate::models::PatentImage {
+                Some(crate::core::models::PatentImage {
                     url: img["url"].as_str()?.to_string(),
                     figure_number: img["figure_number"].as_str().map(String::from),
                 })
@@ -263,9 +262,9 @@ fn parse_single_patent_result(
     let assignee = result["assignee"].as_str().map(String::from);
     let related_application: Option<String> =
         result["related_application"].as_str().map(String::from);
-    let claiming_priority: Option<Vec<crate::models::ApplicationInfo>> =
+    let claiming_priority: Option<Vec<crate::core::models::ApplicationInfo>> =
         serde_json::from_value(result["claiming_priority"].clone()).unwrap_or(None);
-    let family_applications: Option<Vec<crate::models::ApplicationInfo>> =
+    let family_applications: Option<Vec<crate::core::models::ApplicationInfo>> =
         serde_json::from_value(result["family_applications"].clone()).unwrap_or(None);
     let legal_status = result["legal_status"].as_str().map(String::from);
 

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::core::{Error, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -12,7 +12,7 @@ pub struct Config {
 impl Config {
     pub fn load() -> Result<Self> {
         let proj_dirs = ProjectDirs::from("com", "google-patent-cli", "google-patent-cli")
-            .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?;
+            .ok_or_else(|| Error::Config("Could not determine config directory".to_string()))?;
         let config_path = proj_dirs.config_dir().join("config.toml");
 
         Self::load_from_path(&config_path)
@@ -25,14 +25,14 @@ impl Config {
 
         let content = std::fs::read_to_string(path)?;
         let config: Self = toml::from_str(&content)
-            .map_err(|e| anyhow::anyhow!("Failed to parse config: {}", e))?;
+            .map_err(|e| Error::Config(format!("Failed to parse config: {}", e)))?;
 
         Ok(config)
     }
 
     pub fn save(&self) -> Result<()> {
         let proj_dirs = ProjectDirs::from("com", "google-patent-cli", "google-patent-cli")
-            .context("Could not determine config directory")?;
+            .ok_or_else(|| Error::Config("Could not determine config directory".to_string()))?;
         let config_dir = proj_dirs.config_dir();
         let config_file = config_dir.join("config.toml");
 
@@ -41,12 +41,15 @@ impl Config {
 
     pub fn save_to_path(&self, path: &Path) -> Result<()> {
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).context("Failed to create config directory")?;
+            fs::create_dir_all(parent)
+                .map_err(|e| Error::Config(format!("Failed to create config directory: {}", e)))?;
         }
 
-        let content = toml::to_string_pretty(self).context("Failed to serialize config")?;
+        let content = toml::to_string_pretty(self)
+            .map_err(|e| Error::Config(format!("Failed to serialize config: {}", e)))?;
 
-        fs::write(path, content).context("Failed to write config file")?;
+        fs::write(path, content)
+            .map_err(|e| Error::Config(format!("Failed to write config file: {}", e)))?;
         Ok(())
     }
 }

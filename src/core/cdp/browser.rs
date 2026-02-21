@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use crate::core::{Error, Result};
 use serde_json::Value;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -126,9 +126,10 @@ impl CdpBrowser {
                 }
                 std::thread::sleep(Duration::from_millis(100));
             }
-            Err(anyhow!("Failed to discover Chrome debugging port"))
+            Err(Error::Browser("Failed to discover Chrome debugging port".to_string()))
         })
-        .await??;
+        .await
+        .map_err(|e| Error::Browser(format!("Task failed: {}", e)))??;
 
         // Wait for Chrome to start and expose the debugging port
         // Retry get_ws_url with backoff instead of fixed sleep
@@ -158,7 +159,11 @@ impl CdpBrowser {
             }
         }
 
-        Err(last_error.unwrap_or_else(|| anyhow!("Failed to get WebSocket URL after retries")))
+        Err(last_error
+            .map(|e| Error::Browser(format!("Failed to get WebSocket URL after retries: {}", e)))
+            .unwrap_or_else(|| {
+                Error::Browser("Failed to get WebSocket URL after retries".to_string())
+            }))
     }
 
     /// Get WebSocket debugger URL from Chrome
@@ -174,7 +179,7 @@ impl CdpBrowser {
         response["webSocketDebuggerUrl"]
             .as_str()
             .map(String::from)
-            .ok_or_else(|| anyhow!("Could not find webSocketDebuggerUrl"))
+            .ok_or_else(|| Error::Browser("Could not find webSocketDebuggerUrl".to_string()))
     }
 
     /// Create a new page and return its WebSocket URL
@@ -187,10 +192,9 @@ impl CdpBrowser {
             .json()
             .await?;
 
-        response["webSocketDebuggerUrl"]
-            .as_str()
-            .map(String::from)
-            .ok_or_else(|| anyhow!("Could not find webSocketDebuggerUrl for new page"))
+        response["webSocketDebuggerUrl"].as_str().map(String::from).ok_or_else(|| {
+            Error::Browser("Could not find webSocketDebuggerUrl for new page".to_string())
+        })
     }
 }
 

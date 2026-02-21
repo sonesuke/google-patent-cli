@@ -96,7 +96,7 @@ pub struct SearchOptions {
 }
 
 impl SearchOptions {
-    pub fn to_url(&self) -> anyhow::Result<String> {
+    pub fn to_url(&self) -> crate::core::Result<String> {
         if let Some(patent_number) = &self.patent_number {
             return self.language.as_ref().map_or_else(
                 || Ok(format!("https://patents.google.com/patent/{}", patent_number)),
@@ -179,7 +179,9 @@ impl SearchOptions {
         // Manual check for empty params (after constructing)
         // Check if url string ends with / or /? and has no params
         if !url_str.contains('?') || url_str.ends_with('?') {
-            return Err(anyhow::anyhow!("Must provide either --query, --assignee or --patent"));
+            return Err(crate::core::Error::Search(
+                "Must provide either --query, --assignee or --patent".to_string(),
+            ));
         }
 
         Ok(url_str)
