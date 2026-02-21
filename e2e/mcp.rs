@@ -1,6 +1,28 @@
 use serde_json::json;
 use std::io::{BufRead, BufReader, Write};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
+
+fn graceful_shutdown(mut child: Child) {
+    // Drop stdin to signal the MCP server to exit
+    drop(child.stdin.take());
+
+    // Wait for the process to exit gracefully
+    let start = Instant::now();
+    let timeout = Duration::from_secs(5);
+
+    while start.elapsed() < timeout {
+        match child.try_wait() {
+            Ok(Some(_)) => return, // Exited
+            Ok(None) => std::thread::sleep(Duration::from_millis(100)),
+            Err(_) => break,
+        }
+    }
+
+    // Fallback to kill if it doesn't exit
+    let _ = child.kill();
+    let _ = child.wait();
+}
 
 #[test]
 fn test_mcp_initialize() {
@@ -37,9 +59,9 @@ fn test_mcp_initialize() {
     // The SDK returns ServerCapabilities directly as the result
     assert!(response.contains("tools"), "Response did not contain tools: {}", response);
 
-    // Cleanup
-    let _ = child.kill();
-    let _ = child.wait();
+    // Re-attach stdin for graceful_shutdown
+    child.stdin = Some(stdin);
+    graceful_shutdown(child);
 }
 
 #[test]
@@ -92,6 +114,7 @@ fn test_mcp_list_tools() {
     assert!(response.contains("search_patents"), "List tools response failed: {}", response);
     assert!(response.contains("fetch_patent"), "List tools response failed: {}", response);
 
-    let _ = child.kill();
-    let _ = child.wait();
+    // Re-attach stdin for graceful_shutdown
+    child.stdin = Some(stdin);
+    graceful_shutdown(child);
 }
