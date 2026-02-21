@@ -259,10 +259,7 @@ impl BrowserManager {
             return Ok(Arc::clone(browser));
         }
 
-        let mut args = vec![
-            "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "--disable-blink-features=AutomationControlled",
-        ];
+        let mut args = vec!["--disable-blink-features=AutomationControlled"];
 
         if std::env::var("CI").is_ok() {
             args.push("--disable-gpu");
