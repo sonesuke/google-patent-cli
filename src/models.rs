@@ -28,7 +28,7 @@ pub struct SummaryItem {
     pub percentage: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct SearchResult {
     pub total_results: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -38,7 +38,7 @@ pub struct SearchResult {
     pub patents: Vec<Patent>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Patent {
     pub id: String,
     pub title: String,
