@@ -26,6 +26,8 @@ toml = "0.9.8"
 reqwest = { version = "0.11", features = ["json"] }
 url = "2"
 uuid = { version = "1.18.1", features = ["v4"] }
+mcp-sdk-rs = "0.3.4"
+async-trait = "0.1"
 
 [dev-dependencies]
 assert_cmd = "2"
@@ -34,3 +36,7 @@ predicates = "3"
 [[test]]
 name = "e2e_cli"
 path = "e2e/cli.rs"
+
+[[test]]
+name = "e2e_mcp"
+path = "e2e/mcp.rs"
