@@ -1,10 +1,11 @@
 FROM rust:1-slim-bookworm
+
 # Set UTF-8 locale
 ENV LANG=C.UTF-8 \
     LANGUAGE=C.UTF-8 \
     LC_ALL=C.UTF-8
 
-# Install dependencies as root
+# Install Node.js and other dependencies as root
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
     curl \
@@ -14,7 +15,6 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     ripgrep \
     tmux \
     vim \
-    chromium \
     && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js LTS manually
