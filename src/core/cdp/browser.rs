@@ -54,12 +54,9 @@ impl CdpBrowser {
         cmd.arg(format!("--user-data-dir={}", temp_dir.display()));
         cmd.arg("--password-store=basic"); // Prevent keychain prompts on macOS/Linux
         cmd.arg("--no-first-run"); // Skip first run wizards
-        cmd.arg("--no-sandbox"); // Required for CI/Docker
-        cmd.arg("--disable-setuid-sandbox");
-        cmd.arg("--disable-dev-shm-usage"); // Prevent /dev/shm issues in CI
 
         if headless {
-            cmd.arg("--headless=new");
+            cmd.arg("--headless");
         }
 
         for arg in args {
