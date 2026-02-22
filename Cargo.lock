@@ -529,7 +529,7 @@ dependencies = [
 
 [[package]]
 name = "google-patent-cli"
-version = "0.0.10"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
