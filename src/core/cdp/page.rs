@@ -16,15 +16,21 @@ impl CdpPage {
         let connection = CdpConnection::connect(ws_url).await?;
 
         // Enable necessary domains
-        connection.send_command("Page.enable", json!({})).await?;
-        connection.send_command("Runtime.enable", json!({})).await?;
+        if let Err(e) = connection.send_command("Page.enable", json!({})).await {
+            return Err(Error::Browser(format!("Failed to enable Page domain: {}", e)));
+        }
+        if let Err(e) = connection.send_command("Runtime.enable", json!({})).await {
+            return Err(Error::Browser(format!("Failed to enable Runtime domain: {}", e)));
+        }
 
         Ok(Self { connection })
     }
 
     /// Navigate to a URL
     pub async fn goto(&self, url: &str) -> Result<()> {
-        self.connection.send_command("Page.navigate", json!({ "url": url })).await?;
+        if let Err(e) = self.connection.send_command("Page.navigate", json!({ "url": url })).await {
+            return Err(Error::Browser(format!("Failed to navigate to URL '{}': {}", url, e)));
+        }
 
         Ok(())
     }
@@ -51,10 +57,9 @@ impl CdpPage {
     pub async fn get_html(&self) -> Result<String> {
         let script = "document.documentElement.outerHTML";
         let result = self.evaluate(script).await?;
-        result
-            .as_str()
-            .map(String::from)
-            .ok_or_else(|| Error::Browser("Failed to get HTML".to_string()))
+        result.as_str().map(String::from).ok_or_else(|| {
+            Error::Browser("Failed to get HTML: JavaScript result was not a string".to_string())
+        })
     }
 
     /// Evaluate JavaScript and return the result
@@ -72,7 +77,18 @@ impl CdpPage {
             .await?;
 
         if let Some(exception) = result.get("exceptionDetails") {
-            return Err(Error::Browser(format!("JavaScript error: {:?}", exception)));
+            let exception_text = exception["exception"]["description"]
+                .as_str()
+                .or_else(|| exception["text"].as_str())
+                .unwrap_or("unknown error");
+
+            let column_number = exception["columnNumber"].as_i64().unwrap_or(-1);
+            let line_number = exception["lineNumber"].as_i64().unwrap_or(-1);
+
+            return Err(Error::Browser(format!(
+                "JavaScript execution error at line {}, column {}: {}",
+                line_number, column_number, exception_text
+            )));
         }
 
         Ok(result["result"]["value"].clone())
@@ -80,7 +96,10 @@ impl CdpPage {
 
     /// Close the page/tab
     pub async fn close(&self) -> Result<()> {
-        self.connection.send_command("Page.close", json!({})).await?;
+        self.connection
+            .send_command("Page.close", json!({}))
+            .await
+            .map_err(|e| Error::Browser(format!("Failed to close page: {}", e)))?;
         Ok(())
     }
 }

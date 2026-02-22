@@ -17,7 +17,26 @@ pub struct CdpConnection {
 impl CdpConnection {
     /// Connect to Chrome DevTools Protocol via WebSocket
     pub async fn connect(ws_url: &str) -> Result<Self> {
-        let (ws_stream, _) = connect_async(ws_url).await?;
+        let (ws_stream, response) = match connect_async(ws_url).await {
+            Ok(pair) => pair,
+            Err(e) => {
+                return Err(Error::Browser(format!(
+                    "Failed to connect to Chrome debugger WebSocket ({}): {}\n\n\
+                     Troubleshooting:\n\
+                     - Verify Chrome is running with remote debugging enabled\n\
+                     - Check if the port is correct\n\
+                     - Ensure no firewall is blocking the connection",
+                    ws_url, e
+                )))
+            }
+        };
+
+        // Log the HTTP response headers for debugging
+        let headers = response.headers();
+        if std::env::var("DEBUG").as_deref() == Ok("1") {
+            eprintln!("Chrome WebSocket connection response headers: {:?}", headers);
+        }
+
         let (mut write, mut read) = ws_stream.split();
 
         let (command_tx, mut command_rx) =
@@ -56,7 +75,9 @@ impl CdpConnection {
                                 if let Some(responder) = responder {
                                     if let Some(error) = v.get("error") {
                                         let _ = responder.send(Err(Error::Browser(format!(
-                                            "CDP error: {}",
+                                            "CDP error for command {}: {} - {}",
+                                            id,
+                                            error["code"].as_i64().unwrap_or(-1),
                                             error["message"].as_str().unwrap_or("unknown")
                                         ))));
                                     } else if let Some(result) = v.get("result") {
