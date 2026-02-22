@@ -29,9 +29,6 @@ pub enum Error {
     #[error("WebSocket error: {0}")]
     WebSocket(Box<tokio_tungstenite::tungstenite::Error>),
 
-    #[error("MCP protocol error: {0}")]
-    McpProtocol(#[from] mcp_sdk_rs::error::Error),
-
     #[error("MCP error: {0}")]
     Mcp(String),
 

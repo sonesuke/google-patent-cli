@@ -26,7 +26,8 @@ toml = "0.9.8"
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 url = "2"
 uuid = { version = "1.18.1", features = ["v4"] }
-mcp-sdk-rs = "0.3.4"
+# MCP SDK (official) - using 0.16.0
+rmcp = { version = "0.16", features = ["server", "macros", "transport-io"] }
 async-trait = "0.1"
 thiserror = "2"
 
