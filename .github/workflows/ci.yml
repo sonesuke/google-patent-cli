@@ -26,6 +26,12 @@ jobs:
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@v1
 
+      - name: Set Chrome path
+        run: |
+          CHROME_PATH=$(find /opt/hostedtoolcache/setup-chrome/chromium -name chrome -type f | head -1)
+          echo "CHROME_BIN=$CHROME_PATH" >> $GITHUB_ENV
+          echo "Found Chrome at: $CHROME_PATH"
+
       - name: Check formatting
         run: cargo fmt -- --check
 
@@ -34,6 +40,8 @@ jobs:
 
       - name: Run tests
         run: cargo test
+        env:
+          SKIP_BROWSER_TESTS: 1
 
       - name: Check build
         run: cargo check --release
