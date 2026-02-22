@@ -23,6 +23,9 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v1
+
       - name: Check formatting
         run: cargo fmt -- --check
 
