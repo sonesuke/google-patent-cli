@@ -42,11 +42,12 @@ fn test_mcp_initialize() {
         "id": 1,
         "method": "initialize",
         "params": {
-            "implementation": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {
                 "name": "test-client",
                 "version": "1.0.0"
-            },
-            "capabilities": {}
+            }
         }
     });
 
@@ -84,8 +85,9 @@ fn test_mcp_list_tools() {
         "id": 1,
         "method": "initialize",
         "params": {
-            "implementation": { "name": "test", "version": "1.0" },
-            "capabilities": {}
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": { "name": "test", "version": "1.0" }
         }
     });
     writeln!(stdin, "{}", init_request).expect("Failed to write init");
@@ -96,7 +98,7 @@ fn test_mcp_list_tools() {
     // 2. Initialized notification
     let initialized_notification = json!({
         "jsonrpc": "2.0",
-        "method": "initialized"
+        "method": "notifications/initialized"
     });
     writeln!(stdin, "{}", initialized_notification).expect("Failed to write initialized");
 
@@ -139,8 +141,9 @@ fn test_mcp_search_patents() {
         "id": 1,
         "method": "initialize",
         "params": {
-            "implementation": { "name": "test", "version": "1.0" },
-            "capabilities": {}
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": { "name": "test", "version": "1.0" }
         }
     });
     writeln!(stdin, "{}", init_request).expect("Failed to write init");
@@ -150,7 +153,7 @@ fn test_mcp_search_patents() {
     // 2. Initialized notification
     let initialized_notification = json!({
         "jsonrpc": "2.0",
-        "method": "initialized"
+        "method": "notifications/initialized"
     });
     writeln!(stdin, "{}", initialized_notification).expect("Failed to write initialized");
 
@@ -201,8 +204,9 @@ fn test_mcp_fetch_patent() {
         "id": 1,
         "method": "initialize",
         "params": {
-            "implementation": { "name": "test", "version": "1.0" },
-            "capabilities": {}
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": { "name": "test", "version": "1.0" }
         }
     });
     writeln!(stdin, "{}", init_request).expect("Failed to write init");
@@ -212,7 +216,7 @@ fn test_mcp_fetch_patent() {
     // 2. Initialized notification
     let initialized_notification = json!({
         "jsonrpc": "2.0",
-        "method": "initialized"
+        "method": "notifications/initialized"
     });
     writeln!(stdin, "{}", initialized_notification).expect("Failed to write initialized");
 

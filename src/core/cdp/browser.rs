@@ -126,21 +126,45 @@ impl CdpBrowser {
             let mut process_guard = process_ext.lock().unwrap();
             let exit_status = process_guard.try_wait().unwrap_or(None);
 
-            let mut err_msg = match std::fs::read_to_string(&stderr_path_for_error) {
-                Ok(content) => {
-                    format!("Failed to discover Chrome debugging port. Chrome stderr:\n{}", content)
-                }
-                Err(_) => {
-                    "Failed to discover Chrome debugging port. Could not read stderr.".to_string()
-                }
+            let chrome_stderr = match std::fs::read_to_string(&stderr_path_for_error) {
+                Ok(content) => content,
+                Err(e) => format!("(Could not read stderr file: {})", e),
             };
 
+            let os_info = format!(
+                "{} {} ({})",
+                std::env::consts::OS,
+                std::env::consts::ARCH,
+                std::env::consts::FAMILY
+            );
+
+            let ci_env = std::env::var("CI").is_ok();
+            let chrome_bin = std::env::var("CHROME_BIN").ok().unwrap_or_else(|| "default".to_string());
+
+            let mut err_msg = format!(
+                "=== Chrome Browser Launch Failure ===\n\
+                 OS: {}\n\
+                 Chrome Executable: {:?}\n\
+                 CHROME_BIN env: {}\n\
+                 CI Environment: {}\n\
+                 User Data Dir: {:?}\n\
+                 === Chrome stderr ===\n{}\n\
+                 === End of stderr ===",
+                os_info, chrome_path, chrome_bin, ci_env, temp_dir, chrome_stderr
+            );
+
             if let Some(status) = exit_status {
-                err_msg =
-                    format!("{}\nChrome process exited early with status: {}", err_msg, status);
+                err_msg = format!("{}\n\nChrome process exited early with status: {}", err_msg, status);
             } else {
-                err_msg =
-                    format!("{}\nChrome process is still running but port was not found.", err_msg);
+                err_msg = format!(
+                    "{}\n\nChrome process is still running but debugging port was not found after 10 seconds.\n\n\
+                     Troubleshooting:\n\
+                     - If running in CI, ensure Chrome/Chromium is installed and accessible\n\
+                     - Check if Chrome requires additional flags (e.g., --no-sandbox for Linux CI)\n\
+                     - Verify the temp directory is writable\n\
+                     - Try running with CHROME_BIN=/usr/bin/google-chrome-stable (or appropriate path)",
+                    err_msg
+                );
             }
 
             Err(Error::Browser(err_msg))
@@ -182,40 +206,113 @@ impl CdpBrowser {
         }
 
         Err(last_error
-            .map(|e| Error::Browser(format!("Failed to get WebSocket URL after retries: {}", e)))
+            .map(|e| {
+                Error::Browser(format!(
+                    "Failed to get WebSocket URL from Chrome after {} attempts (port {}): {}",
+                    max_retries, port, e
+                ))
+            })
             .unwrap_or_else(|| {
-                Error::Browser("Failed to get WebSocket URL after retries".to_string())
+                Error::Browser(format!(
+                    "Failed to get WebSocket URL from Chrome after {} attempts (port {})",
+                    max_retries, port
+                ))
             }))
     }
 
     /// Get WebSocket debugger URL from Chrome
     async fn get_ws_url(port: u16) -> Result<String> {
+        let url = format!("http://127.0.0.1:{}/json/version", port);
         let client = reqwest::Client::new();
-        let response: Value = client
-            .get(format!("http://127.0.0.1:{}/json/version", port))
-            .send()
-            .await?
-            .json()
-            .await?;
 
-        response["webSocketDebuggerUrl"]
-            .as_str()
-            .map(String::from)
-            .ok_or_else(|| Error::Browser("Could not find webSocketDebuggerUrl".to_string()))
+        let response = match client.get(&url).send().await {
+            Ok(resp) => resp,
+            Err(e) => {
+                return Err(Error::Browser(format!(
+                    "Failed to connect to Chrome debugger endpoint ({}): {}",
+                    url, e
+                )))
+            }
+        };
+
+        let status = response.status();
+        let body = match response.text().await {
+            Ok(text) => text,
+            Err(e) => {
+                return Err(Error::Browser(format!("Failed to read response from {}: {}", url, e)))
+            }
+        };
+
+        if !status.is_success() {
+            return Err(Error::Browser(format!(
+                "Chrome debugger endpoint returned error status {} ({}). Response: {}",
+                status, url, body
+            )));
+        }
+
+        let value: Value = match serde_json::from_str(&body) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(Error::Browser(format!(
+                    "Failed to parse JSON response from {}: {}. Response body: {}",
+                    url, e, body
+                )))
+            }
+        };
+
+        value["webSocketDebuggerUrl"].as_str().map(String::from).ok_or_else(|| {
+            Error::Browser(format!(
+                "Chrome debugger response does not contain webSocketDebuggerUrl. Response: {}",
+                body
+            ))
+        })
     }
 
     /// Create a new page and return its WebSocket URL
     pub async fn new_page(&self) -> Result<String> {
+        let url = format!("http://127.0.0.1:{}/json/new", self.port);
         let client = reqwest::Client::new();
-        let response: Value = client
-            .put(format!("http://127.0.0.1:{}/json/new", self.port))
-            .send()
-            .await?
-            .json()
-            .await?;
 
-        response["webSocketDebuggerUrl"].as_str().map(String::from).ok_or_else(|| {
-            Error::Browser("Could not find webSocketDebuggerUrl for new page".to_string())
+        let response = match client.put(&url).send().await {
+            Ok(resp) => resp,
+            Err(e) => {
+                return Err(Error::Browser(format!(
+                    "Failed to create new page via Chrome debugger ({}): {}",
+                    url, e
+                )))
+            }
+        };
+
+        let status = response.status();
+        let body = match response.text().await {
+            Ok(text) => text,
+            Err(e) => {
+                return Err(Error::Browser(format!("Failed to read response from {}: {}", url, e)))
+            }
+        };
+
+        if !status.is_success() {
+            return Err(Error::Browser(format!(
+                "Chrome debugger returned error {} when creating new page ({}). Response: {}",
+                status, url, body
+            )));
+        }
+
+        let value: Value = match serde_json::from_str(&body) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(Error::Browser(format!(
+                    "Failed to parse JSON response from {}: {}. Response body: {}",
+                    url, e, body
+                )))
+            }
+        };
+
+        value["webSocketDebuggerUrl"].as_str().map(String::from).ok_or_else(|| {
+            Error::Browser(format!(
+                "Could not find webSocketDebuggerUrl in response. Response: {}",
+                body
+            ))
         })
     }
 }
