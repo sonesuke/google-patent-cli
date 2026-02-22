@@ -30,6 +30,10 @@ mcp-sdk-rs = "0.3.4"
 async-trait = "0.1"
 thiserror = "2"
 
+[dependencies.openssl-sys]
+version = "0.9"
+features = ["vendored"]
+
 [dev-dependencies]
 assert_cmd = "2"
 predicates = "3"
