@@ -154,7 +154,7 @@ impl ServerHandler for PatentHandler {
 /// Run the MCP server over stdio
 pub async fn run() -> anyhow::Result<()> {
     let config = Config::load()?;
-    let searcher = PatentSearcher::new(config.browser_path, true, false)
+    let searcher = PatentSearcher::new(config.browser_path, true, false, false)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to create PatentSearcher: {}", e))?;
     let handler = PatentHandler::new(Arc::new(searcher));

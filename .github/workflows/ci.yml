@@ -58,3 +58,16 @@ jobs:
 
       - name: Check build
         run: cargo check --release
+
+      - name: Test verbose mode
+        run: |
+          # Build the CLI first
+          cargo build --release
+
+          # Test verbose mode with a simple search
+          ./target/release/google-patent-cli search --query "test" --limit 1 --verbose || {
+            echo "Verbose mode test failed"
+            exit 1
+          }
+
+          echo "Verbose mode test passed"
