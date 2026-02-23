@@ -136,6 +136,39 @@ google-patent-cli config
 # Set custom browser path
 google-patent-cli config --set-browser "/path/to/chrome"
 ```
- 
+
+### Configuration File
+
+The configuration file is located at:
+- **Linux/macOS**: `~/.config/google-patent-cli/config.toml`
+- **Windows**: `%APPDATA%\google-patent-cli\config.toml`
+
+You can manually edit the TOML file to configure additional Chrome arguments:
+
+```toml
+# Path to Chrome/Chromium executable
+browser_path = "/usr/bin/google-chrome"
+
+# Additional Chrome arguments (useful for Docker/CI environments)
+chrome_args = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox"
+]
+```
+
+### Docker/DevContainer Environment
+
+When running in Docker containers or devcontainers, Chrome requires additional flags to work properly. You can configure these flags via `chrome_args` in your config file:
+
+```toml
+chrome_args = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-gpu"
+]
+```
+
+Alternatively, set the `CI=true` environment variable to automatically add these flags.
+
 ## License
 MIT

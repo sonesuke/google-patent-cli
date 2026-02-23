@@ -141,8 +141,9 @@ pub async fn run_app(cli: Cli) -> Result<()> {
             }
 
             let config = Config::load()?;
+            let chrome_args = config.chrome_args.clone();
             let searcher =
-                PatentSearcher::new(config.browser_path, !args.head, args.debug, args.verbose)
+                PatentSearcher::new(config.browser_path, !args.head, args.debug, args.verbose, chrome_args)
                     .await?;
 
             let options = SearchOptions {
@@ -162,8 +163,9 @@ pub async fn run_app(cli: Cli) -> Result<()> {
         }
         Commands::Fetch { args } => {
             let config = Config::load()?;
+            let chrome_args = config.chrome_args.clone();
             let searcher =
-                PatentSearcher::new(config.browser_path, !args.head, args.debug, args.verbose)
+                PatentSearcher::new(config.browser_path, !args.head, args.debug, args.verbose, chrome_args)
                     .await?;
 
             if args.raw {

@@ -59,8 +59,9 @@ impl PatentSearcher {
         headless: bool,
         debug: bool,
         verbose: bool,
+        chrome_args: Vec<String>,
     ) -> Result<Self> {
-        let browser_manager = BrowserManager::new(browser_path, headless, debug);
+        let browser_manager = BrowserManager::new(browser_path, headless, debug, chrome_args);
 
         Ok(Self { browser_manager, verbose })
     }
