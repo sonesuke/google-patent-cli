@@ -177,7 +177,10 @@ fn test_mcp_search_patents() {
     reader.read_line(&mut response).expect("Failed to read search response");
 
     assert!(response.contains("result"), "Search response failed: {}", response);
-    assert!(response.contains("patents"), "Search response missing patents: {}", response);
+    // Now returns summary with count and patent_ids, not full patents
+    assert!(response.contains("count"), "Search response missing count: {}", response);
+    assert!(response.contains("patent_ids"), "Search response missing patent_ids: {}", response);
+    assert!(response.contains("output_file"), "Search response missing output_file: {}", response);
 
     // Re-attach stdin for graceful_shutdown
     child.stdin = Some(stdin);

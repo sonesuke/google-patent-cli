@@ -37,11 +37,6 @@ pub struct SearchPatentsRequest {
 
     #[schemars(description = "Language/locale for patent pages (e.g., 'ja', 'en', 'zh')")]
     pub language: Option<String>,
-
-    #[schemars(
-        description = "Optional file path to write the full results (JSON format). If specified, returns a summary instead of the full data."
-    )]
-    pub output_file: Option<String>,
 }
 
 /// Request parameters for fetching a patent
@@ -56,11 +51,6 @@ pub struct FetchPatentRequest {
 
     #[schemars(description = "Language/locale for patent pages (e.g., 'ja', 'en', 'zh')")]
     pub language: Option<String>,
-
-    #[schemars(
-        description = "Optional file path to write the full results (JSON format). If specified, returns a summary instead of the full data."
-    )]
-    pub output_file: Option<String>,
 }
 
 /// Search result summary for returning to AI
@@ -110,43 +100,35 @@ impl PatentHandler {
             language: request.language.clone(),
         };
 
-        match self.searcher.search(&options).await {
-            Ok(results) => {
-                let patent_ids: Vec<String> =
-                    results.patents.iter().map(|p| p.id.clone()).collect();
-                let count = results.patents.len();
-                let total_results = results.total_results.clone();
+        let results = self.searcher.search(&options).await.map_err(|e| {
+            ErrorData::new(ErrorCode::INTERNAL_ERROR, format!("Search failed: {}", e), None)
+        })?;
 
-                // If output_file is specified, write results to file and return summary
-                if let Some(output_path) = request.output_file {
-                    let json_str = serde_json::to_string_pretty(&results).unwrap_or_default();
-                    match tokio::fs::write(&output_path, json_str).await {
-                        Ok(_) => {
-                            let summary = SearchResultSummary {
-                                count,
-                                patent_ids,
-                                total_results,
-                                output_file: Some(output_path),
-                            };
-                            Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
-                        }
-                        Err(e) => Err(ErrorData::new(
-                            ErrorCode::INTERNAL_ERROR,
-                            format!("Failed to write to file {}: {}", output_path, e),
-                            None,
-                        )),
-                    }
-                } else {
-                    // No output_file, return full results
-                    Ok(serde_json::to_string_pretty(&results).unwrap_or_default())
-                }
-            }
-            Err(e) => Err(ErrorData::new(
+        let patent_ids: Vec<String> = results.patents.iter().map(|p| p.id.clone()).collect();
+        let count = results.patents.len();
+        let total_results = results.total_results.clone();
+
+        // Create temp file and write results
+        let temp_dir = std::env::temp_dir();
+        let file_name = format!("patent-search-{}.json", uuid::Uuid::new_v4());
+        let output_path = temp_dir.join(&file_name);
+        let json_str = serde_json::to_string_pretty(&results).unwrap_or_default();
+
+        tokio::fs::write(&output_path, json_str).await.map_err(|e| {
+            ErrorData::new(
                 ErrorCode::INTERNAL_ERROR,
-                format!("Search failed: {}", e),
+                format!("Failed to write to file {}: {}", output_path.display(), e),
                 None,
-            )),
-        }
+            )
+        })?;
+
+        let summary = SearchResultSummary {
+            count,
+            patent_ids,
+            total_results,
+            output_file: output_path.to_str().map(String::from),
+        };
+        Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
     }
 
     /// Fetch details of a specific patent by ID
@@ -178,47 +160,40 @@ impl PatentHandler {
                 limit: None,
                 language: request.language,
             };
-            match self.searcher.search(&options).await {
-                Ok(mut results) => match results.patents.pop() {
-                    Some(patent) => {
-                        let patent_id = patent.id.clone();
+            let mut results = self.searcher.search(&options).await.map_err(|e| {
+                ErrorData::new(ErrorCode::INTERNAL_ERROR, format!("Fetch failed: {}", e), None)
+            })?;
 
-                        // If output_file is specified, write results to file and return summary
-                        if let Some(output_path) = request.output_file {
-                            let json_str =
-                                serde_json::to_string_pretty(&patent).unwrap_or_default();
-                            match tokio::fs::write(&output_path, json_str).await {
-                                Ok(_) => {
-                                    let summary = FetchResultSummary {
-                                        patent_id: patent_id.clone(),
-                                        output_file: Some(output_path),
-                                        raw: false,
-                                    };
-                                    Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
-                                }
-                                Err(e) => Err(ErrorData::new(
-                                    ErrorCode::INTERNAL_ERROR,
-                                    format!("Failed to write to file {}: {}", output_path, e),
-                                    None,
-                                )),
-                            }
-                        } else {
-                            // No output_file, return full patent data
-                            Ok(serde_json::to_string_pretty(&patent).unwrap_or_default())
-                        }
-                    }
-                    None => Err(ErrorData::new(
-                        ErrorCode::INVALID_PARAMS,
-                        format!("No patent found with ID: {}", request.patent_id),
-                        None,
-                    )),
-                },
-                Err(e) => Err(ErrorData::new(
-                    ErrorCode::INTERNAL_ERROR,
-                    format!("Fetch failed: {}", e),
+            let patent = results.patents.pop().ok_or_else(|| {
+                ErrorData::new(
+                    ErrorCode::INVALID_PARAMS,
+                    format!("No patent found with ID: {}", request.patent_id),
                     None,
-                )),
-            }
+                )
+            })?;
+
+            let patent_id = patent.id.clone();
+
+            // Create temp file and write results
+            let temp_dir = std::env::temp_dir();
+            let file_name = format!("patent-{}.json", uuid::Uuid::new_v4());
+            let output_path = temp_dir.join(&file_name);
+            let json_str = serde_json::to_string_pretty(&patent).unwrap_or_default();
+
+            tokio::fs::write(&output_path, json_str).await.map_err(|e| {
+                ErrorData::new(
+                    ErrorCode::INTERNAL_ERROR,
+                    format!("Failed to write to file {}: {}", output_path.display(), e),
+                    None,
+                )
+            })?;
+
+            let summary = FetchResultSummary {
+                patent_id,
+                output_file: output_path.to_str().map(String::from),
+                raw: false,
+            };
+            Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
         }
     }
 }
@@ -341,83 +316,6 @@ mod tests {
             before: None,
             limit: None,
             language: None,
-            output_file: None,
-        };
-        let result = handler.search_patents(Parameters(request)).await;
-        assert!(result.is_ok());
-        let result_str = result.unwrap();
-        assert!(result_str.contains("SEARCH1"));
-        assert!(result_str.contains("Search Result"));
-    }
-
-    #[tokio::test]
-    async fn test_fetch_patent() {
-        let handler = PatentHandler::new(Arc::new(MockSearcher));
-
-        // Success case
-        let request = FetchPatentRequest {
-            patent_id: "US123".to_string(),
-            raw: false,
-            language: None,
-            output_file: None,
-        };
-        let result = handler.fetch_patent(Parameters(request)).await;
-        assert!(result.is_ok());
-        assert!(result.unwrap().contains("US123"));
-
-        // Raw HTML case
-        let request = FetchPatentRequest {
-            patent_id: "US123".to_string(),
-            raw: true,
-            language: None,
-            output_file: None,
-        };
-        let result = handler.fetch_patent(Parameters(request)).await;
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "<html>US123</html>");
-
-        // Not found case
-        let request = FetchPatentRequest {
-            patent_id: "NONE".to_string(),
-            raw: false,
-            language: None,
-            output_file: None,
-        };
-        let result = handler.fetch_patent(Parameters(request)).await;
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.message.contains("No patent found"));
-
-        // Error case
-        let request = FetchPatentRequest {
-            patent_id: "FAIL".to_string(),
-            raw: false,
-            language: None,
-            output_file: None,
-        };
-        let result = handler.fetch_patent(Parameters(request)).await;
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.message.contains("Fetch failed"));
-    }
-
-    #[tokio::test]
-    async fn test_search_patents_with_output_file() {
-        let handler = PatentHandler::new(Arc::new(MockSearcher));
-
-        // Use a temporary file for output
-        let temp_file = tempfile::NamedTempFile::new().unwrap();
-        let temp_path = temp_file.path().to_str().unwrap().to_string();
-
-        let request = SearchPatentsRequest {
-            query: Some("test".to_string()),
-            assignee: None,
-            country: None,
-            after: None,
-            before: None,
-            limit: None,
-            language: None,
-            output_file: Some(temp_path.clone()),
         };
         let result = handler.search_patents(Parameters(request)).await;
         assert!(result.is_ok());
@@ -425,50 +323,72 @@ mod tests {
 
         // Should contain summary, not full results
         assert!(result_str.contains("\"count\""));
-        assert!(result_str.contains("1"));
         assert!(result_str.contains("\"patent_ids\""));
         assert!(result_str.contains("SEARCH1"));
-        assert!(result_str.contains(&temp_path));
+        assert!(result_str.contains("\"output_file\""));
 
-        // File should exist and contain the full results
-        assert!(std::path::Path::new(&temp_path).exists());
-        let file_content = tokio::fs::read_to_string(&temp_path).await.unwrap();
+        // Extract file path from JSON and verify file exists with full results
+        let summary: SearchResultSummary = serde_json::from_str(&result_str).unwrap();
+        assert_eq!(summary.count, 1);
+        assert_eq!(summary.patent_ids, vec!["SEARCH1"]);
+        assert!(summary.output_file.is_some());
+
+        let output_file = summary.output_file.unwrap();
+        let file_content = tokio::fs::read_to_string(&output_file).await.unwrap();
         assert!(file_content.contains("SEARCH1"));
         assert!(file_content.contains("Search Result"));
 
         // Clean up
-        let _ = std::fs::remove_file(&temp_path);
+        let _ = tokio::fs::remove_file(&output_file).await;
     }
 
     #[tokio::test]
-    async fn test_fetch_patent_with_output_file() {
+    async fn test_fetch_patent() {
         let handler = PatentHandler::new(Arc::new(MockSearcher));
 
-        // Use a temporary file for output
-        let temp_file = tempfile::NamedTempFile::new().unwrap();
-        let temp_path = temp_file.path().to_str().unwrap().to_string();
-
-        let request = FetchPatentRequest {
-            patent_id: "US123".to_string(),
-            raw: false,
-            language: None,
-            output_file: Some(temp_path.clone()),
-        };
+        // Success case (JSON mode)
+        let request =
+            FetchPatentRequest { patent_id: "US123".to_string(), raw: false, language: None };
         let result = handler.fetch_patent(Parameters(request)).await;
         assert!(result.is_ok());
         let result_str = result.unwrap();
 
-        // Should contain summary, not full results
+        // Should contain summary with file path
         assert!(result_str.contains("\"patent_id\""));
         assert!(result_str.contains("US123"));
-        assert!(result_str.contains(&temp_path));
+        assert!(result_str.contains("\"output_file\""));
 
-        // File should exist and contain the full patent data
-        assert!(std::path::Path::new(&temp_path).exists());
-        let file_content = tokio::fs::read_to_string(&temp_path).await.unwrap();
-        assert!(file_content.contains("US123"));
+        let summary: FetchResultSummary = serde_json::from_str(&result_str).unwrap();
+        assert_eq!(summary.patent_id, "US123");
+        assert!(!summary.raw);
+        assert!(summary.output_file.is_some());
+
+        let output_file = summary.output_file.unwrap();
 
         // Clean up
-        let _ = std::fs::remove_file(&temp_path);
+        let _ = tokio::fs::remove_file(&output_file).await;
+
+        // Raw HTML case - returns HTML directly
+        let request =
+            FetchPatentRequest { patent_id: "US123".to_string(), raw: true, language: None };
+        let result = handler.fetch_patent(Parameters(request)).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "<html>US123</html>");
+
+        // Not found case
+        let request =
+            FetchPatentRequest { patent_id: "NONE".to_string(), raw: false, language: None };
+        let result = handler.fetch_patent(Parameters(request)).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.message.contains("No patent found"));
+
+        // Error case
+        let request =
+            FetchPatentRequest { patent_id: "FAIL".to_string(), raw: false, language: None };
+        let result = handler.fetch_patent(Parameters(request)).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.message.contains("Fetch failed"));
     }
 }
