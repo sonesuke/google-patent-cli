@@ -369,6 +369,8 @@ impl BrowserManager {
 
         if std::env::var("CI").is_ok() {
             args.push("--disable-gpu");
+            args.push("--no-sandbox");
+            args.push("--disable-setuid-sandbox");
         }
 
         let browser_path = self.browser_path.clone();
