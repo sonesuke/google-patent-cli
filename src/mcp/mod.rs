@@ -1,16 +1,18 @@
 use crate::core::config::Config;
 use crate::core::models::SearchOptions;
+use crate::core::models::{Patent, SearchResult};
 use crate::core::patent_search::{PatentSearch, PatentSearcher};
 use rmcp::{
     handler::server::{tool::ToolRouter, wrapper::Parameters},
     model::{
         ErrorCode, Implementation, ProtocolVersion, ServerCapabilities, ServerInfo, ToolsCapability,
     },
-    schemars::{self, JsonSchema},
+    schemars::{self, schema_for, JsonSchema},
     service::{NotificationContext, RequestContext},
     tool, tool_handler, tool_router, ErrorData, RoleServer, ServerHandler, ServiceExt,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
 use tokio::io::{stdin, stdout};
 
@@ -56,18 +58,15 @@ pub struct FetchPatentRequest {
 /// Search result summary for returning to AI
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SearchResultSummary {
-    pub count: usize,
-    pub patent_ids: Vec<String>,
-    pub total_results: String,
-    pub output_file: Option<String>,
+    pub output_file: String,
+    pub schema: Value,
 }
 
 /// Fetch result summary for returning to AI
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FetchResultSummary {
-    pub patent_id: String,
-    pub output_file: Option<String>,
-    pub raw: bool,
+    pub output_file: String,
+    pub schema: Value,
 }
 
 /// MCP handler for Google Patent CLI
@@ -104,9 +103,8 @@ impl PatentHandler {
             ErrorData::new(ErrorCode::INTERNAL_ERROR, format!("Search failed: {}", e), None)
         })?;
 
-        let patent_ids: Vec<String> = results.patents.iter().map(|p| p.id.clone()).collect();
-        let count = results.patents.len();
-        let total_results = results.total_results.clone();
+        // Generate JSON schema for SearchResult
+        let schema = schema_for!(SearchResult);
 
         // Create temp file and write results
         let temp_dir = std::env::temp_dir();
@@ -122,12 +120,9 @@ impl PatentHandler {
             )
         })?;
 
-        let summary = SearchResultSummary {
-            count,
-            patent_ids,
-            total_results,
-            output_file: output_path.to_str().map(String::from),
-        };
+        let output_file = output_path.to_str().unwrap().to_string();
+        let summary =
+            SearchResultSummary { output_file, schema: serde_json::to_value(schema).unwrap() };
         Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
     }
 
@@ -138,8 +133,9 @@ impl PatentHandler {
         Parameters(request): Parameters<FetchPatentRequest>,
     ) -> Result<String, ErrorData> {
         if request.raw {
-            // Raw HTML mode - return directly (no file output for raw HTML)
-            self.searcher
+            // Raw HTML mode - write to file and return summary
+            let html = self
+                .searcher
                 .get_raw_html(&request.patent_id, request.language.as_deref())
                 .await
                 .map_err(|e| {
@@ -148,7 +144,32 @@ impl PatentHandler {
                         format!("Failed to fetch raw HTML: {}", e),
                         None,
                     )
-                })
+                })?;
+
+            // Schema for HTML (string type)
+            let schema = serde_json::json!({
+                "type": "string",
+                "description": "Raw HTML of the patent page"
+            });
+
+            // Create temp file and write HTML
+            let temp_dir = std::env::temp_dir();
+            let file_name = format!("patent-{}.html", uuid::Uuid::new_v4());
+            let output_path = temp_dir.join(&file_name);
+
+            tokio::fs::write(&output_path, html).await.map_err(|e| {
+                ErrorData::new(
+                    ErrorCode::INTERNAL_ERROR,
+                    format!("Failed to write to file {}: {}", output_path.display(), e),
+                    None,
+                )
+            })?;
+
+            let summary = FetchResultSummary {
+                output_file: output_path.to_str().unwrap().to_string(),
+                schema,
+            };
+            Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
         } else {
             let options = SearchOptions {
                 query: None,
@@ -172,7 +193,8 @@ impl PatentHandler {
                 )
             })?;
 
-            let patent_id = patent.id.clone();
+            // Generate JSON schema for Patent
+            let schema = schema_for!(Patent);
 
             // Create temp file and write results
             let temp_dir = std::env::temp_dir();
@@ -189,9 +211,8 @@ impl PatentHandler {
             })?;
 
             let summary = FetchResultSummary {
-                patent_id,
-                output_file: output_path.to_str().map(String::from),
-                raw: false,
+                output_file: output_path.to_str().unwrap().to_string(),
+                schema: serde_json::to_value(schema).unwrap(),
             };
             Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
         }
@@ -321,25 +342,21 @@ mod tests {
         assert!(result.is_ok());
         let result_str = result.unwrap();
 
-        // Should contain summary, not full results
-        assert!(result_str.contains("\"count\""));
-        assert!(result_str.contains("\"patent_ids\""));
-        assert!(result_str.contains("SEARCH1"));
+        // Should contain summary with output_file and schema
         assert!(result_str.contains("\"output_file\""));
+        assert!(result_str.contains("\"schema\""));
 
-        // Extract file path from JSON and verify file exists with full results
+        // Extract file path and schema from JSON
         let summary: SearchResultSummary = serde_json::from_str(&result_str).unwrap();
-        assert_eq!(summary.count, 1);
-        assert_eq!(summary.patent_ids, vec!["SEARCH1"]);
-        assert!(summary.output_file.is_some());
+        assert!(summary.output_file.starts_with('/')); // Absolute path
+        assert!(summary.schema.is_object()); // Schema is a JSON object
 
-        let output_file = summary.output_file.unwrap();
-        let file_content = tokio::fs::read_to_string(&output_file).await.unwrap();
+        let file_content = tokio::fs::read_to_string(&summary.output_file).await.unwrap();
         assert!(file_content.contains("SEARCH1"));
         assert!(file_content.contains("Search Result"));
 
         // Clean up
-        let _ = tokio::fs::remove_file(&output_file).await;
+        let _ = tokio::fs::remove_file(&summary.output_file).await;
     }
 
     #[tokio::test]
@@ -353,27 +370,38 @@ mod tests {
         assert!(result.is_ok());
         let result_str = result.unwrap();
 
-        // Should contain summary with file path
-        assert!(result_str.contains("\"patent_id\""));
-        assert!(result_str.contains("US123"));
+        // Should contain summary with file path and schema
         assert!(result_str.contains("\"output_file\""));
+        assert!(result_str.contains("\"schema\""));
 
         let summary: FetchResultSummary = serde_json::from_str(&result_str).unwrap();
-        assert_eq!(summary.patent_id, "US123");
-        assert!(!summary.raw);
-        assert!(summary.output_file.is_some());
-
-        let output_file = summary.output_file.unwrap();
+        assert!(summary.output_file.starts_with('/')); // Absolute path
+        assert!(summary.schema.is_object()); // Schema is a JSON object
 
         // Clean up
-        let _ = tokio::fs::remove_file(&output_file).await;
+        let _ = tokio::fs::remove_file(&summary.output_file).await;
 
-        // Raw HTML case - returns HTML directly
+        // Raw HTML case - also writes to file and returns summary
         let request =
             FetchPatentRequest { patent_id: "US123".to_string(), raw: true, language: None };
         let result = handler.fetch_patent(Parameters(request)).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "<html>US123</html>");
+        let result_str = result.unwrap();
+
+        // Should contain summary with file path and schema
+        assert!(result_str.contains("\"output_file\""));
+        assert!(result_str.contains("\"schema\""));
+
+        let summary: FetchResultSummary = serde_json::from_str(&result_str).unwrap();
+        assert!(summary.output_file.starts_with('/')); // Absolute path
+        assert!(summary.schema.is_object()); // Schema is a JSON object
+
+        // Verify HTML file
+        let file_content = tokio::fs::read_to_string(&summary.output_file).await.unwrap();
+        assert!(file_content.contains("<html>US123</html>"));
+
+        // Clean up
+        let _ = tokio::fs::remove_file(&summary.output_file).await;
 
         // Not found case
         let request =
