@@ -23,8 +23,29 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Setup Chrome
-        uses: browser-actions/setup-chrome@v1
+      - name: Setup Chrome configuration
+        run: |
+          # Check if Chrome exists in standard locations
+          if [ -f "/usr/bin/google-chrome" ]; then
+            CHROME_PATH="/usr/bin/google-chrome"
+          elif [ -f "/usr/bin/chromium-browser" ]; then
+            CHROME_PATH="/usr/bin/chromium-browser"
+          else
+            echo "ERROR: Chrome/Chromium not found"
+            exit 1
+          fi
+
+          echo "Found Chrome at: $CHROME_PATH"
+          $CHROME_PATH --version
+
+          # Create config directory and set browser path
+          mkdir -p ~/.config/google-patent-cli
+          cat > ~/.config/google-patent-cli/config.toml << EOF
+          browser_path = "$CHROME_PATH"
+          EOF
+
+          echo "Config file created:"
+          cat ~/.config/google-patent-cli/config.toml
 
       - name: Check formatting
         run: cargo fmt -- --check

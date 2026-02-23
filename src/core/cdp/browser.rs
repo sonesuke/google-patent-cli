@@ -86,8 +86,8 @@ impl CdpBrowser {
         // Spawn a thread to read stderr and look for the port
         tokio::spawn(async move {
             let start = std::time::Instant::now();
-            // Try for up to 10 seconds
-            while start.elapsed().as_secs() < 10 {
+            // Try for up to 30 seconds (CI environments may be slower)
+            while start.elapsed().as_secs() < 30 {
                 if let Ok(content) = std::fs::read_to_string(&stderr_path) {
                     for line in content.lines() {
                         if debug_flag {
@@ -113,9 +113,9 @@ impl CdpBrowser {
 
         let stderr_path_for_error = stderr_file.clone();
         let process_ext = process.clone();
-        // Wait for the port to be discovered (up to 10 seconds)
+        // Wait for the port to be discovered (up to 30 seconds for slower CI environments)
         let discovered_port = tokio::task::spawn_blocking(move || {
-            for _ in 0..100 {
+            for _ in 0..300 {
                 let port_val = port.lock().map_or(None, |guard| *guard);
 
                 if let Some(p) = port_val {
@@ -157,12 +157,12 @@ impl CdpBrowser {
                 err_msg = format!("{}\n\nChrome process exited early with status: {}", err_msg, status);
             } else {
                 err_msg = format!(
-                    "{}\n\nChrome process is still running but debugging port was not found after 10 seconds.\n\n\
+                    "{}\n\nChrome process is still running but debugging port was not found after 30 seconds.\n\n\
                      Troubleshooting:\n\
                      - If running in CI, ensure Chrome/Chromium is installed and accessible\n\
                      - Check if Chrome requires additional flags (e.g., --no-sandbox for Linux CI)\n\
                      - Verify the temp directory is writable\n\
-                     - Try running with CHROME_BIN=/usr/bin/google-chrome-stable (or appropriate path)",
+                     - Try using 'config --set-browser' to specify the correct Chrome path",
                     err_msg
                 );
             }
