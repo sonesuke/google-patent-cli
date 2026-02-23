@@ -57,6 +57,10 @@ pub struct SearchArgs {
     #[arg(long, default_value_t = false)]
     pub debug: bool,
 
+    /// Enable verbose output (shows detailed progress)
+    #[arg(long, default_value_t = false)]
+    pub verbose: bool,
+
     /// Language/locale for patent pages (e.g., ja, en, zh)
     #[arg(long)]
     pub language: Option<String>,
@@ -78,6 +82,10 @@ pub struct FetchArgs {
     /// Enable debug output (shows Chrome logs)
     #[arg(long, default_value_t = false)]
     pub debug: bool,
+
+    /// Enable verbose output (shows detailed progress)
+    #[arg(long, default_value_t = false)]
+    pub verbose: bool,
 
     /// Language/locale for patent pages (e.g., ja, en, zh)
     #[arg(long)]
@@ -133,7 +141,9 @@ pub async fn run_app(cli: Cli) -> Result<()> {
             }
 
             let config = Config::load()?;
-            let searcher = PatentSearcher::new(config.browser_path, !args.head, args.debug).await?;
+            let searcher =
+                PatentSearcher::new(config.browser_path, !args.head, args.debug, args.verbose)
+                    .await?;
 
             let options = SearchOptions {
                 query: args.query,
@@ -152,7 +162,9 @@ pub async fn run_app(cli: Cli) -> Result<()> {
         }
         Commands::Fetch { args } => {
             let config = Config::load()?;
-            let searcher = PatentSearcher::new(config.browser_path, !args.head, args.debug).await?;
+            let searcher =
+                PatentSearcher::new(config.browser_path, !args.head, args.debug, args.verbose)
+                    .await?;
 
             if args.raw {
                 let html = searcher.get_raw_html(&args.patent_id, args.language.as_deref()).await?;

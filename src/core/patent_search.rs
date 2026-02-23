@@ -11,6 +11,7 @@ pub trait PatentSearch: Send + Sync {
 
 pub struct PatentSearcher {
     browser_manager: BrowserManager,
+    verbose: bool,
 }
 
 #[async_trait]
@@ -57,10 +58,11 @@ impl PatentSearcher {
         browser_path: Option<std::path::PathBuf>,
         headless: bool,
         debug: bool,
+        verbose: bool,
     ) -> Result<Self> {
         let browser_manager = BrowserManager::new(browser_path, headless, debug);
 
-        Ok(Self { browser_manager })
+        Ok(Self { browser_manager, verbose })
     }
 
     async fn search_internal(&self, options: &SearchOptions) -> Result<SearchResult> {
@@ -70,10 +72,20 @@ impl PatentSearcher {
 
         let base_url = options.to_url()?;
 
+        if self.verbose {
+            eprintln!("Search URL: {}", base_url);
+        }
+
         if let Some(patent_number) = &options.patent_number {
             // Single patent lookup - no pagination needed
+            if self.verbose {
+                eprintln!("Fetching single patent: {}", patent_number);
+            }
             page.goto(&base_url).await?;
 
+            if self.verbose {
+                eprintln!("Waiting for page to load...");
+            }
             // Wait for meta description or title tag to ensure page is loaded
             let loaded = page
                 .wait_for_element("meta[name='description'], meta[name='DC.title']", 15)
@@ -92,6 +104,9 @@ impl PatentSearcher {
             // Give a little time for all dynamic content (like claims) to fully render
             tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
+            if self.verbose {
+                eprintln!("Extracting patent data...");
+            }
             // Single patent page - extract structured data
             let result = page.evaluate(include_str!("scripts/extract_patent.js")).await?;
 
@@ -113,6 +128,10 @@ impl PatentSearcher {
             let mut top_assignees: Option<Vec<crate::core::models::SummaryItem>> = None;
             let mut top_cpcs: Option<Vec<crate::core::models::SummaryItem>> = None;
 
+            if self.verbose {
+                eprintln!("Fetching search results (limit: {})...", limit);
+            }
+
             // Append num=100 to base_url to fetch more results per page if needed
             // This reduces the need for multiple page loads for limits <= 100
             let base_url = if limit > 10 { format!("{}&num=100", base_url) } else { base_url };
@@ -132,16 +151,27 @@ impl PatentSearcher {
                     format!("{}&page={}", base_url, page_num)
                 };
 
+                if self.verbose {
+                    eprintln!("Loading page {} of {}...", page_num + 1, pages_needed);
+                    eprintln!("URL: {}", page_url);
+                }
+
                 page.goto(&page_url).await?;
 
                 // Wait for results to load
                 let loaded = page.wait_for_element(".search-result-item", 15).await?;
                 if !loaded {
                     // No results on this page, stop pagination
+                    if self.verbose {
+                        eprintln!("No results found on this page, stopping pagination.");
+                    }
                     let _ = page.close().await;
                     break;
                 }
 
+                if self.verbose {
+                    eprintln!("Extracting search results from page...");
+                }
                 let results =
                     page.evaluate(include_str!("scripts/extract_search_results.js")).await?;
 
@@ -149,7 +179,10 @@ impl PatentSearcher {
 
                 // Only capture total results and summary data from the first page
                 if page_num == 0 {
-                    total_results_str = sr.total_results;
+                    total_results_str = sr.total_results.clone();
+                    if self.verbose {
+                        eprintln!("Total results found: {}", total_results_str);
+                    }
                     top_assignees = sr.top_assignees;
 
                     // Two-step CPC extraction: click CPCs tab and wait for DOM update
@@ -161,6 +194,10 @@ impl PatentSearcher {
                 }
 
                 let page_patents = sr.patents;
+
+                if self.verbose {
+                    eprintln!("Found {} patents on this page", page_patents.len());
+                }
 
                 // If we got no results, stop pagination
                 if page_patents.is_empty() {
@@ -176,8 +213,15 @@ impl PatentSearcher {
             }
             let _ = page.close().await;
 
+            if self.verbose {
+                eprintln!("Total patents collected: {}", all_patents.len());
+            }
+
             // Truncate to exact limit
             if all_patents.len() > limit {
+                if self.verbose {
+                    eprintln!("Truncating to limit: {}", limit);
+                }
                 all_patents.truncate(limit);
             }
 
