@@ -177,7 +177,9 @@ fn test_mcp_search_patents() {
     reader.read_line(&mut response).expect("Failed to read search response");
 
     assert!(response.contains("result"), "Search response failed: {}", response);
-    assert!(response.contains("patents"), "Search response missing patents: {}", response);
+    // Now returns summary with output_file and schema
+    assert!(response.contains("output_file"), "Search response missing output_file: {}", response);
+    assert!(response.contains("schema"), "Search response missing schema: {}", response);
 
     // Re-attach stdin for graceful_shutdown
     child.stdin = Some(stdin);
@@ -237,7 +239,9 @@ fn test_mcp_fetch_patent() {
     response.clear();
     reader.read_line(&mut response).expect("Failed to read fetch response");
 
-    assert!(response.contains("US9152718B2"), "Fetch response failed: {}", response);
+    // Now returns summary with output_file and schema
+    assert!(response.contains("output_file"), "Fetch response missing output_file: {}", response);
+    assert!(response.contains("schema"), "Fetch response missing schema: {}", response);
 
     // Re-attach stdin for graceful_shutdown
     child.stdin = Some(stdin);

@@ -1,34 +1,34 @@
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct DescriptionParagraph {
     pub number: String,
     pub id: String,
     pub text: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Claim {
     pub number: String,
     pub id: String,
     pub text: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PatentImage {
     pub url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub figure_number: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SummaryItem {
     pub name: String,
     pub percentage: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, schemars::JsonSchema)]
 pub struct SearchResult {
     pub total_results: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -38,7 +38,7 @@ pub struct SearchResult {
     pub patents: Vec<Patent>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, schemars::JsonSchema)]
 pub struct Patent {
     pub id: String,
     pub title: String,
@@ -69,7 +69,7 @@ pub struct Patent {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ApplicationInfo {
     pub application_number: String,
     #[serde(skip_serializing_if = "Option::is_none")]
