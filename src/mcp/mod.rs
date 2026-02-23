@@ -53,17 +53,30 @@ pub struct FetchPatentRequest {
     pub language: Option<String>,
 }
 
+/// Summary output for search/fetch operations
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct OperationSummary {
+    pub hits: usize,
+    pub total_results: String,
+    pub resource_id: String,
+}
+
 /// MCP handler for Google Patent CLI
 #[derive(Clone)]
 pub struct PatentHandler {
     tool_router: ToolRouter<PatentHandler>,
     searcher: Arc<dyn PatentSearch>,
+    store: Arc<tokio::sync::Mutex<std::collections::HashMap<String, String>>>,
 }
 
 #[tool_router(router = tool_router)]
 impl PatentHandler {
     pub fn new(searcher: Arc<dyn PatentSearch>) -> Self {
-        Self { tool_router: Self::tool_router(), searcher }
+        Self {
+            tool_router: Self::tool_router(),
+            searcher,
+            store: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
+        }
     }
 
     /// Search Google Patents for patents matching a query
@@ -86,7 +99,27 @@ impl PatentHandler {
         self.searcher
             .search(&options)
             .await
-            .map(|results| serde_json::to_string_pretty(&results).unwrap_or_default())
+            .map(|results| {
+                let hits = results.patents.len();
+                let total_results = results.total_results.clone();
+
+                // Store result with resource ID
+                let resource_id = uuid::Uuid::new_v4().to_string();
+                let content = serde_json::to_string_pretty(&results).unwrap_or_default();
+
+                let resource_id_clone = resource_id.clone();
+                let store = self.store.clone();
+                tokio::spawn(async move {
+                    let mut s = store.lock().await;
+                    s.insert(resource_id_clone, content);
+                });
+
+                // Return summary
+                let summary =
+                    OperationSummary { hits, total_results, resource_id: resource_id.clone() };
+
+                serde_json::to_string_pretty(&summary).unwrap_or_default()
+            })
             .map_err(|e| {
                 ErrorData::new(ErrorCode::INTERNAL_ERROR, format!("Search failed: {}", e), None)
             })
@@ -129,7 +162,27 @@ impl PatentHandler {
                             None,
                         ))
                     },
-                    |patent| Ok(serde_json::to_string_pretty(&patent).unwrap_or_default()),
+                    |patent| {
+                        // Store result with resource ID
+                        let resource_id = uuid::Uuid::new_v4().to_string();
+                        let content = serde_json::to_string_pretty(&patent).unwrap_or_default();
+
+                        let resource_id_clone = resource_id.clone();
+                        let store = self.store.clone();
+                        tokio::spawn(async move {
+                            let mut s = store.lock().await;
+                            s.insert(resource_id_clone, content);
+                        });
+
+                        // Return summary
+                        let summary = OperationSummary {
+                            hits: 1,
+                            total_results: "1".to_string(),
+                            resource_id: resource_id.clone(),
+                        };
+
+                        Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
+                    },
                 ),
                 Err(e) => Err(ErrorData::new(
                     ErrorCode::INTERNAL_ERROR,
@@ -139,6 +192,32 @@ impl PatentHandler {
             }
         }
     }
+
+    /// Download stored result by resource ID
+    #[tool(
+        description = "Download the full patent data using the resource_id from a previous search or fetch operation"
+    )]
+    pub async fn download_result(
+        &self,
+        Parameters(request): Parameters<DownloadResultRequest>,
+    ) -> Result<String, ErrorData> {
+        let store = self.store.lock().await;
+        match store.get(&request.resource_id) {
+            Some(content) => Ok(content.clone()),
+            None => Err(ErrorData::new(
+                ErrorCode::INVALID_PARAMS,
+                format!("Resource not found: {}", request.resource_id),
+                None,
+            )),
+        }
+    }
+}
+
+/// Request parameters for downloading a stored result
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct DownloadResultRequest {
+    #[schemars(description = "The resource ID from a previous search or fetch operation")]
+    pub resource_id: String,
 }
 
 #[tool_handler(router = self.tool_router)]
@@ -151,7 +230,7 @@ impl ServerHandler for PatentHandler {
                 ..Default::default()
             },
             instructions: Some(
-                "Google Patent CLI MCP Server - Search and fetch patents from Google Patents"
+                "Google Patent CLI MCP Server - Search and fetch patents from Google Patents. Use download_result with the resource_id to get full data."
                     .to_string(),
             ),
             server_info: Implementation {
@@ -263,22 +342,26 @@ mod tests {
         let result = handler.search_patents(Parameters(request)).await;
         assert!(result.is_ok());
         let result_str = result.unwrap();
-        assert!(result_str.contains("SEARCH1"));
-        assert!(result_str.contains("Search Result"));
+        // Should return summary with resource_id
+        assert!(result_str.contains("resource_id"));
+        assert!(result_str.contains("hits"));
     }
 
     #[tokio::test]
     async fn test_fetch_patent() {
         let handler = PatentHandler::new(Arc::new(MockSearcher));
 
-        // Success case
+        // Success case - should return summary with resource_id
         let request =
             FetchPatentRequest { patent_id: "US123".to_string(), raw: false, language: None };
         let result = handler.fetch_patent(Parameters(request)).await;
         assert!(result.is_ok());
-        assert!(result.unwrap().contains("US123"));
+        let result_str = result.unwrap();
+        // Should return summary with resource_id
+        assert!(result_str.contains("resource_id"));
+        assert!(result_str.contains("\"hits\": 1"));
 
-        // Raw HTML case
+        // Raw HTML case - should return HTML directly
         let request =
             FetchPatentRequest { patent_id: "US123".to_string(), raw: true, language: None };
         let result = handler.fetch_patent(Parameters(request)).await;
