@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct Config {
     pub browser_path: Option<PathBuf>,
+    #[serde(default)]
+    pub chrome_args: Vec<String>,
 }
 
 impl Config {

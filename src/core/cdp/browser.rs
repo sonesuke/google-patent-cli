@@ -335,11 +335,17 @@ pub struct BrowserManager {
     browser_path: Option<PathBuf>,
     headless: bool,
     debug: bool,
+    chrome_args: Vec<String>,
     state: Arc<Mutex<BrowserState>>,
 }
 
 impl BrowserManager {
-    pub fn new(browser_path: Option<PathBuf>, headless: bool, debug: bool) -> Self {
+    pub fn new(
+        browser_path: Option<PathBuf>,
+        headless: bool,
+        debug: bool,
+        chrome_args: Vec<String>,
+    ) -> Self {
         let state = Arc::new(Mutex::new(BrowserState { browser: None, last_used: Instant::now() }));
 
         // Spawn the inactivity monitor task
@@ -354,7 +360,7 @@ impl BrowserManager {
             }
         });
 
-        Self { browser_path, headless, debug, state }
+        Self { browser_path, headless, debug, chrome_args, state }
     }
 
     pub async fn get_browser(&self) -> Result<Arc<CdpBrowser>> {
@@ -369,6 +375,13 @@ impl BrowserManager {
 
         if std::env::var("CI").is_ok() {
             args.push("--disable-gpu");
+            args.push("--no-sandbox");
+            args.push("--disable-setuid-sandbox");
+        }
+
+        // Add custom Chrome args from config
+        for arg in &self.chrome_args {
+            args.push(arg.as_str());
         }
 
         let browser_path = self.browser_path.clone();
