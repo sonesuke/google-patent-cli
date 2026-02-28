@@ -8,6 +8,7 @@ ENV LANG=C.UTF-8 \
 # Install Node.js and other dependencies as root
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
+    build-essential \
     curl \
     git \
     pkg-config \
@@ -16,7 +17,11 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     tmux \
     vim \
     jq \
-    && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+    sudo \
+    chromium \
+    lcov \
+    && apt-get clean -y && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/bin/chromium /usr/bin/google-chrome
 
 # Install Node.js LTS manually
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
@@ -30,7 +35,3 @@ ENV PATH=/usr/local/cargo/bin:$PATH
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash \
     && rustup component add rustfmt clippy llvm-tools-preview \
     && cargo binstall -y cargo-audit cargo-llvm-cov
-
-# Install mise
-RUN curl https://mise.run | sh \
-    && cp ~/.local/bin/mise /usr/local/bin/mise
