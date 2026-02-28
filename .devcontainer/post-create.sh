@@ -42,11 +42,11 @@ EOF
     echo 'eval "$(mise activate zsh)"' >> $HOME/.zshrc
 
     # Configure google-patent-cli to use chromium
+    # Note: chrome_args will be dynamically determined by the app
     echo "[Devcontainer Setup] Configuring google-patent-cli..."
     mkdir -p "$HOME/.config/google-patent-cli"
     cat > "$HOME/.config/google-patent-cli/config.toml" <<EOF
 browser_path = "/usr/bin/chromium"
-chrome_args = ["--no-sandbox", "--disable-gpu"]
 EOF
 
     # Run mise install
