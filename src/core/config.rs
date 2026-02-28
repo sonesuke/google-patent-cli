@@ -1,6 +1,7 @@
 use crate::core::{Error, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -54,6 +55,78 @@ impl Config {
             .map_err(|e| Error::Config(format!("Failed to write config file: {}", e)))?;
         Ok(())
     }
+
+    /// Resolve browser path and chrome args with priority:
+    /// 1. config.toml values (highest priority)
+    /// 2. CI environment (CI=1)
+    /// 3. Auto-detection (fallback)
+    pub fn resolve(&self) -> (Option<PathBuf>, Vec<String>) {
+        // Priority 1: Use config.toml values if explicitly set
+        if self.browser_path.is_some() || !self.chrome_args.is_empty() {
+            return (self.browser_path.clone(), self.chrome_args.clone());
+        }
+
+        // Priority 2: CI environment
+        if env::var("CI").is_ok() || env::var("GITHUB_ACTIONS").is_ok() {
+            if let Some(path) = detect_chrome_path() {
+                // CI typically runs in containers/VMs, so add --no-sandbox
+                return (Some(path), vec!["--no-sandbox".to_string()]);
+            }
+        }
+
+        // Priority 3: Auto-detection
+        let path = detect_chrome_path();
+        let mut args = vec![];
+
+        // Add --no-sandbox for containerized environments
+        if is_running_in_container() {
+            args.push("--no-sandbox".to_string());
+        }
+
+        (path, args)
+    }
+}
+
+/// Detect Chrome/Chromium path from common locations
+fn detect_chrome_path() -> Option<PathBuf> {
+    let candidates = [
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/chromium-browser",
+        "/usr/bin/chromium",
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    ];
+
+    for candidate in candidates {
+        let path = PathBuf::from(candidate);
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+/// Detect if running in a containerized environment (Docker/Kubernetes)
+fn is_running_in_container() -> bool {
+    // Check for .dockerenv file (Docker)
+    if PathBuf::from("/.dockerenv").exists() {
+        return true;
+    }
+
+    // Check /proc/1/cgroup for container indicators
+    if let Ok(content) = fs::read_to_string("/proc/1/cgroup") {
+        if content.contains("docker")
+            || content.contains("kubepods")
+            || content.contains("containerd")
+        {
+            return true;
+        }
+    }
+
+    false
 }
 
 #[cfg(test)]
@@ -87,5 +160,31 @@ mod tests {
 
         // Clean up
         let _ = std::fs::remove_file(config_path);
+    }
+
+    #[test]
+    fn test_resolve_with_config_values() {
+        // When browser_path is set, it should be used
+        let config = Config {
+            browser_path: Some(PathBuf::from("/custom/chrome")),
+            chrome_args: vec!["--custom-arg".to_string()],
+        };
+
+        let (path, args) = config.resolve();
+        assert_eq!(path, Some(PathBuf::from("/custom/chrome")));
+        assert_eq!(args, vec!["--custom-arg".to_string()]);
+    }
+
+    #[test]
+    fn test_resolve_auto_detect() {
+        // When no config is set, should auto-detect (or return None if not found)
+        let config = Config::default();
+
+        let (_path, args) = config.resolve();
+        // We can't assert the exact path since it depends on the system
+        // But we can verify that args contains --no-sandbox if in container
+        if is_running_in_container() {
+            assert!(args.contains(&"--no-sandbox".to_string()));
+        }
     }
 }
