@@ -49,3 +49,9 @@ impl From<anyhow::Error> for Error {
         Error::Other(err.to_string())
     }
 }
+
+impl From<chrome_cdp::Error> for Error {
+    fn from(err: chrome_cdp::Error) -> Self {
+        Error::Browser(err.to_string())
+    }
+}

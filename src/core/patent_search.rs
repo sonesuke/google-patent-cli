@@ -1,5 +1,5 @@
-use crate::core::cdp::{BrowserManager, CdpPage};
 use crate::core::models::{Patent, SearchOptions, SearchResult};
+use crate::core::{BrowserManager, CdpPage};
 use crate::core::{Error, Result};
 use async_trait::async_trait;
 
@@ -47,9 +47,9 @@ impl PatentSearch for PatentSearcher {
             )
             .await?;
 
-        let html = page.get_html().await;
+        let html = page.get_html().await?;
         let _ = page.close().await;
-        html
+        Ok(html)
     }
 }
 
