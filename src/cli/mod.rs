@@ -110,8 +110,10 @@ pub enum Commands {
         #[arg(long)]
         set_browser: Option<PathBuf>,
     },
-    /// Start MCP server
+    /// Start MCP server for patent search
     Mcp,
+    /// Start Cypher JSON Query MCP server
+    CypherMcp,
 }
 
 pub async fn run() -> Result<()> {
@@ -123,6 +125,9 @@ pub async fn run_app(cli: Cli) -> Result<()> {
     match cli.command {
         Commands::Mcp => {
             mcp::run().await?;
+        }
+        Commands::CypherMcp => {
+            mcp::run_cypher().await?;
         }
         Commands::Config { set_browser } => {
             let mut config = Config::load()?;

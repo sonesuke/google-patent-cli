@@ -16,6 +16,8 @@ use serde_json::Value;
 use std::sync::Arc;
 use tokio::io::{stdin, stdout};
 
+pub mod cypher;
+
 /// Request parameters for searching patents
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SearchPatentsRequest {
@@ -264,6 +266,20 @@ pub async fn run() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to serve MCP server: {}", e))?;
 
     server.waiting().await.map_err(|e| anyhow::anyhow!("MCP server error: {}", e))?;
+
+    Ok(())
+}
+
+/// Run the Cypher JSON Query MCP server over stdio
+pub async fn run_cypher() -> anyhow::Result<()> {
+    let handler = cypher::CypherHandler::new();
+
+    let server = handler
+        .serve((stdin(), stdout()))
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to serve Cypher MCP server: {}", e))?;
+
+    server.waiting().await.map_err(|e| anyhow::anyhow!("Cypher MCP server error: {}", e))?;
 
     Ok(())
 }
