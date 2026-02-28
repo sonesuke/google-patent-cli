@@ -13,10 +13,14 @@ use rmcp::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::{stdin, stdout};
+use tokio::sync::RwLock;
 
 pub mod cypher;
+
+use cypher_rs::CypherEngine;
 
 /// Request parameters for searching patents
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -60,15 +64,36 @@ pub struct FetchPatentRequest {
 /// Search result summary for returning to AI
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SearchResultSummary {
+    #[schemars(description = "Path to the output JSON file")]
     pub output_file: String,
+
+    #[schemars(description = "JSON schema of the search results")]
     pub schema: Value,
+
+    #[schemars(description = "Graph schema for Cypher queries")]
+    pub graph_schema: Option<String>,
+
+    #[schemars(description = "Dataset name for Cypher queries")]
+    pub dataset: Option<String>,
+
+    #[schemars(description = "Number of patents found")]
+    pub count: usize,
 }
 
 /// Fetch result summary for returning to AI
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FetchResultSummary {
+    #[schemars(description = "Path to the output JSON file")]
     pub output_file: String,
+
+    #[schemars(description = "JSON schema of the patent data")]
     pub schema: Value,
+
+    #[schemars(description = "Graph schema for Cypher queries")]
+    pub graph_schema: Option<String>,
+
+    #[schemars(description = "Dataset name for Cypher queries")]
+    pub dataset: Option<String>,
 }
 
 /// MCP handler for Google Patent CLI
@@ -76,12 +101,89 @@ pub struct FetchResultSummary {
 pub struct PatentHandler {
     tool_router: ToolRouter<PatentHandler>,
     searcher: Arc<dyn PatentSearch>,
+    // Cypher store for auto-loading search results
+    cypher_store: Arc<RwLock<HashMap<String, CypherEngine>>>,
 }
 
 #[tool_router(router = tool_router)]
 impl PatentHandler {
     pub fn new(searcher: Arc<dyn PatentSearch>) -> Self {
-        Self { tool_router: Self::tool_router(), searcher }
+        Self {
+            tool_router: Self::tool_router(),
+            searcher,
+            cypher_store: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Generate a unique dataset name for the search results
+    fn generate_dataset_name() -> String {
+        format!("patents-{}", uuid::Uuid::new_v4())
+    }
+
+    /// Load JSON data into Cypher store and return graph schema
+    async fn load_to_cypher(&self, name: String, json: &Value) -> Option<String> {
+        let engine = CypherEngine::from_json_auto(json).ok()?;
+        let graph_schema = engine.get_schema();
+
+        // Store the engine
+        let mut store = self.cypher_store.write().await;
+        store.insert(name.clone(), engine);
+
+        Some(graph_schema)
+    }
+
+    /// Internal method to load JSON data into a CypherEngine
+    async fn load_json_data_internal(
+        &self,
+        name: String,
+        json: Value,
+        node_path: Option<String>,
+        id_field: Option<String>,
+        label_field: Option<String>,
+        relation_fields: Option<Vec<String>>,
+    ) -> Result<String, ErrorData> {
+        // Create engine from JSON
+        let engine = if let (Some(node_path), Some(id_field)) = (&node_path, &id_field) {
+            // Manual configuration
+            let config = cypher_rs::GraphConfig {
+                node_path: node_path.clone(),
+                id_field: id_field.clone(),
+                label_field: label_field.clone(),
+                relation_fields: relation_fields.clone().unwrap_or_default(),
+            };
+            CypherEngine::from_json(&json, config)
+        } else {
+            // Auto-detection
+            CypherEngine::from_json_auto(&json)
+        };
+
+        let engine = engine.map_err(|e| {
+            ErrorData::new(
+                ErrorCode::INVALID_PARAMS,
+                format!("Failed to create Cypher engine: {}", e),
+                None,
+            )
+        })?;
+
+        // Get schema info
+        let graph_schema = engine.get_schema();
+
+        // Count nodes
+        let node_count = match engine.execute("MATCH (n) RETURN COUNT(n)") {
+            Ok(r) => match r.get_single_value() {
+                Some(v) => v.as_i64().unwrap_or(0) as usize,
+                None => 0,
+            },
+            Err(_) => 0,
+        };
+
+        // Store the engine
+        let mut store = self.cypher_store.write().await;
+        store.insert(name.clone(), engine);
+
+        let response = cypher::LoadJsonResponse { name, graph_schema, node_count };
+
+        Ok(serde_json::to_string_pretty(&response).unwrap_or_default())
     }
 
     /// Search Google Patents for patents matching a query
@@ -105,6 +207,8 @@ impl PatentHandler {
             ErrorData::new(ErrorCode::INTERNAL_ERROR, format!("Search failed: {}", e), None)
         })?;
 
+        let count = results.patents.len();
+
         // Generate JSON schema for SearchResult
         let schema = schema_for!(SearchResult);
 
@@ -114,7 +218,7 @@ impl PatentHandler {
         let output_path = temp_dir.join(&file_name);
         let json_str = serde_json::to_string_pretty(&results).unwrap_or_default();
 
-        tokio::fs::write(&output_path, json_str).await.map_err(|e| {
+        tokio::fs::write(&output_path, &json_str).await.map_err(|e| {
             ErrorData::new(
                 ErrorCode::INTERNAL_ERROR,
                 format!("Failed to write to file {}: {}", output_path.display(), e),
@@ -122,9 +226,19 @@ impl PatentHandler {
             )
         })?;
 
+        // Auto-load into Cypher for querying
+        let json_value: Value = serde_json::from_str(&json_str).unwrap_or_default();
+        let dataset_name = Self::generate_dataset_name();
+        let graph_schema = self.load_to_cypher(dataset_name.clone(), &json_value).await;
+
         let output_file = output_path.to_str().unwrap().to_string();
-        let summary =
-            SearchResultSummary { output_file, schema: serde_json::to_value(schema).unwrap() };
+        let summary = SearchResultSummary {
+            output_file,
+            schema: serde_json::to_value(schema).unwrap(),
+            graph_schema,
+            dataset: Some(dataset_name),
+            count,
+        };
         Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
     }
 
@@ -170,6 +284,8 @@ impl PatentHandler {
             let summary = FetchResultSummary {
                 output_file: output_path.to_str().unwrap().to_string(),
                 schema,
+                graph_schema: None,
+                dataset: None,
             };
             Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
         } else {
@@ -204,7 +320,7 @@ impl PatentHandler {
             let output_path = temp_dir.join(&file_name);
             let json_str = serde_json::to_string_pretty(&patent).unwrap_or_default();
 
-            tokio::fs::write(&output_path, json_str).await.map_err(|e| {
+            tokio::fs::write(&output_path, &json_str).await.map_err(|e| {
                 ErrorData::new(
                     ErrorCode::INTERNAL_ERROR,
                     format!("Failed to write to file {}: {}", output_path.display(), e),
@@ -212,12 +328,145 @@ impl PatentHandler {
                 )
             })?;
 
+            // Auto-load into Cypher for querying
+            let json_value: Value = serde_json::from_str(&json_str).unwrap_or_default();
+            let dataset_name = Self::generate_dataset_name();
+            let graph_schema = self.load_to_cypher(dataset_name.clone(), &json_value).await;
+
             let summary = FetchResultSummary {
                 output_file: output_path.to_str().unwrap().to_string(),
                 schema: serde_json::to_value(schema).unwrap(),
+                graph_schema,
+                dataset: Some(dataset_name),
             };
             Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
         }
+    }
+
+    /// Execute Cypher query on loaded patent dataset
+    #[tool(description = "Execute a Cypher query on a loaded patent dataset")]
+    pub async fn execute_cypher(
+        &self,
+        Parameters(request): Parameters<cypher::ExecuteCypherRequest>,
+    ) -> Result<String, ErrorData> {
+        // Get the engine
+        let store = self.cypher_store.read().await;
+        let engine = store.get(&request.dataset).ok_or_else(|| {
+            ErrorData::new(
+                ErrorCode::INVALID_PARAMS,
+                format!(
+                    "Dataset '{}' not found. Run search_patents or fetch_patent first.",
+                    request.dataset
+                ),
+                None,
+            )
+        })?;
+
+        // Execute query
+        let result = engine.execute(&request.query).map_err(|e| {
+            ErrorData::new(
+                ErrorCode::INTERNAL_ERROR,
+                format!("Query execution failed: {}", e),
+                None,
+            )
+        })?;
+
+        // Convert results to JSON array
+        let results = result.as_json_array();
+        let row_count = results.as_array().map(|a| a.len()).unwrap_or(0);
+
+        let response = cypher::ExecuteCypherResponse { results, row_count };
+
+        Ok(serde_json::to_string_pretty(&response).unwrap_or_default())
+    }
+
+    /// List all loaded patent datasets
+    #[tool(description = "List all loaded patent datasets")]
+    pub async fn list_patent_datasets(
+        &self,
+        _parameters: Parameters<cypher::ListDatasetsRequest>,
+    ) -> Result<String, ErrorData> {
+        let store = self.cypher_store.read().await;
+        let datasets: Vec<String> = store.keys().cloned().collect();
+
+        let response = cypher::ListDatasetsResponse { datasets, count: store.len() };
+
+        Ok(serde_json::to_string_pretty(&response).unwrap_or_default())
+    }
+
+    /// Load JSON file for Cypher querying
+    #[tool(description = "Load JSON file and create a queryable dataset with auto-detected schema")]
+    pub async fn load_json_file(
+        &self,
+        Parameters(request): Parameters<cypher::LoadJsonFileRequest>,
+    ) -> Result<String, ErrorData> {
+        // Read JSON from file
+        let file_content = tokio::fs::read_to_string(&request.file_path).await.map_err(|e| {
+            ErrorData::new(
+                ErrorCode::INVALID_PARAMS,
+                format!("Failed to read file '{}': {}", request.file_path, e),
+                None,
+            )
+        })?;
+
+        let json: Value = serde_json::from_str(&file_content).map_err(|e| {
+            ErrorData::new(ErrorCode::INVALID_PARAMS, format!("Failed to parse JSON: {}", e), None)
+        })?;
+
+        // Load using internal method
+        self.load_json_data_internal(
+            request.name,
+            json,
+            request.node_path,
+            request.id_field,
+            request.label_field,
+            request.relation_fields,
+        )
+        .await
+    }
+
+    /// Load JSON data directly for Cypher querying
+    #[tool(
+        description = "Load JSON data directly and create a queryable dataset with auto-detected schema"
+    )]
+    pub async fn load_json_data(
+        &self,
+        Parameters(request): Parameters<cypher::LoadJsonDataRequest>,
+    ) -> Result<String, ErrorData> {
+        self.load_json_data_internal(
+            request.name,
+            request.json,
+            request.node_path,
+            request.id_field,
+            request.label_field,
+            request.relation_fields,
+        )
+        .await
+    }
+
+    /// Unload a dataset
+    #[tool(description = "Unload a JSON dataset from memory")]
+    pub async fn unload_dataset(
+        &self,
+        Parameters(request): Parameters<cypher::UnloadDatasetRequest>,
+    ) -> Result<String, ErrorData> {
+        let mut store = self.cypher_store.write().await;
+        let existed = store.remove(&request.name).is_some();
+
+        if !existed {
+            return Err(ErrorData::new(
+                ErrorCode::INVALID_PARAMS,
+                format!("Dataset '{}' not found", request.name),
+                None,
+            ));
+        }
+
+        let response = cypher::UnloadDatasetResponse {
+            message: format!("Dataset '{}' unloaded successfully", request.name),
+            name: request.name,
+        };
+
+        Ok(serde_json::to_string_pretty(&response).unwrap_or_default())
     }
 }
 
@@ -266,20 +515,6 @@ pub async fn run() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to serve MCP server: {}", e))?;
 
     server.waiting().await.map_err(|e| anyhow::anyhow!("MCP server error: {}", e))?;
-
-    Ok(())
-}
-
-/// Run the Cypher JSON Query MCP server over stdio
-pub async fn run_cypher() -> anyhow::Result<()> {
-    let handler = cypher::CypherHandler::new();
-
-    let server = handler
-        .serve((stdin(), stdout()))
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to serve Cypher MCP server: {}", e))?;
-
-    server.waiting().await.map_err(|e| anyhow::anyhow!("Cypher MCP server error: {}", e))?;
 
     Ok(())
 }
