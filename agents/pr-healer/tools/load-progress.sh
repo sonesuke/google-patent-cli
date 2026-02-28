@@ -1,20 +1,43 @@
-#!/bin/bash
-# agents/pr-healer/tools/load-progress.sh
-# Reads and displays the most recent progress entries from progress.jsonl
+#!/usr/bin/env bash
+set -euo pipefail
 
-PROGRESS_FILE="agents/pr-healer/progress.jsonl"
+# Get main worktree path (works from any worktree)
+GIT_COMMON_DIR=$(git rev-parse --git-common-dir)
+MAIN_WORKTREE=$(dirname "$GIT_COMMON_DIR")
+PROGRESS_FILE="$MAIN_WORKTREE/agents/pr-healer/progress.jsonl"
 
-if [ ! -f "$PROGRESS_FILE" ]; then
-    echo "[load-progress] No progress file found. This is a fresh start."
+if [[ ! -f "$PROGRESS_FILE" ]]; then
+    echo "📋 No progress file found - this is a fresh start"
     exit 0
 fi
 
-LINES=$(wc -l < "$PROGRESS_FILE" | tr -d ' ')
+echo "📋 Progress History:"
+echo "===================="
 
-if [ "$LINES" -eq 0 ]; then
-    echo "[load-progress] Progress file is empty. This is a fresh start."
-    exit 0
-fi
+# Group by PR and show latest status
+{
+    read -r header
+    echo "$header"
+    cat "$PROGRESS_FILE"
+} < <(printf "PR\tBranch\tTimestamp\tStatus\n") | column -t -s $'\t'
 
-echo "[load-progress] Showing last 5 entries (of $LINES total):"
-tail -n 5 "$PROGRESS_FILE" | jq .
+echo ""
+echo "Summary:"
+echo "--------"
+
+# Count unique PRs processed
+UNIQUE_PRS=$(jq -r '[.[] | .pr] | unique | length' "$PROGRESS_FILE" 2>/dev/null || echo "0")
+echo "Unique PRs processed: $UNIQUE_PRS"
+
+# Show recent attempts
+echo ""
+echo "Recent attempts (last 10):"
+tail -n 10 "$PROGRESS_FILE" 2>/dev/null | while IFS=$'\t' read -r pr branch timestamp status; do
+    echo "  PR #$pr ($branch): $status at $timestamp"
+done
+
+echo ""
+echo "Use this information to:"
+echo "  - Skip PRs that have already been processed successfully"
+echo "  - Retry PRs that failed previously"
+echo "  - Avoid repeating the same fixes"
