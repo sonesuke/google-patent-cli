@@ -14,6 +14,7 @@ use rmcp::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 use tokio::io::{stdin, stdout};
 use tokio::sync::RwLock;
@@ -47,8 +48,34 @@ pub struct SearchPatentsRequest {
     pub language: Option<String>,
 }
 
+impl Hash for SearchPatentsRequest {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.query.hash(state);
+        self.assignee.hash(state);
+        self.country.hash(state);
+        self.after.hash(state);
+        self.before.hash(state);
+        self.limit.hash(state);
+        self.language.hash(state);
+    }
+}
+
+impl PartialEq for SearchPatentsRequest {
+    fn eq(&self, other: &Self) -> bool {
+        self.query == other.query
+            && self.assignee == other.assignee
+            && self.country == other.country
+            && self.after == other.after
+            && self.before == other.before
+            && self.limit == other.limit
+            && self.language == other.language
+    }
+}
+
+impl Eq for SearchPatentsRequest {}
+
 /// Request parameters for fetching a patent
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Hash, PartialEq, Eq)]
 pub struct FetchPatentRequest {
     #[schemars(description = "The patent ID (e.g., 'US9152718B2')")]
     pub patent_id: String,
@@ -115,9 +142,32 @@ impl PatentHandler {
         }
     }
 
-    /// Generate a unique dataset name for the search results
-    fn generate_dataset_name() -> String {
-        format!("patents-{}", uuid::Uuid::new_v4())
+    /// Generate deterministic dataset name from search request
+    fn dataset_name_from_request(request: &SearchPatentsRequest) -> String {
+        let mut hasher = DefaultHasher::new();
+        request.hash(&mut hasher);
+        let hash = hasher.finish();
+        format!("search-{:x}", hash)
+    }
+
+    /// Generate deterministic dataset name from fetch request
+    fn dataset_name_from_fetch(patent_id: &str) -> String {
+        let mut hasher = DefaultHasher::new();
+        patent_id.hash(&mut hasher);
+        let hash = hasher.finish();
+        format!("fetch-{:x}", hash)
+    }
+
+    /// Evict old datasets if exceeding max cache size
+    async fn evict_old_datasets(&self) {
+        const MAX_CACHE_SIZE: usize = 100;
+        let mut store = self.cypher_store.write().await;
+        while store.len() > MAX_CACHE_SIZE {
+            // Remove oldest entry (first key)
+            if let Some(key) = store.keys().next().cloned() {
+                store.remove(&key);
+            }
+        }
     }
 
     /// Load JSON data into Cypher store and return graph schema
@@ -132,60 +182,6 @@ impl PatentHandler {
         Some(graph_schema)
     }
 
-    /// Internal method to load JSON data into a CypherEngine
-    async fn load_json_data_internal(
-        &self,
-        name: String,
-        json: Value,
-        node_path: Option<String>,
-        id_field: Option<String>,
-        label_field: Option<String>,
-        relation_fields: Option<Vec<String>>,
-    ) -> Result<String, ErrorData> {
-        // Create engine from JSON
-        let engine = if let (Some(node_path), Some(id_field)) = (&node_path, &id_field) {
-            // Manual configuration
-            let config = cypher_rs::GraphConfig {
-                node_path: node_path.clone(),
-                id_field: id_field.clone(),
-                label_field: label_field.clone(),
-                relation_fields: relation_fields.clone().unwrap_or_default(),
-            };
-            CypherEngine::from_json(&json, config)
-        } else {
-            // Auto-detection
-            CypherEngine::from_json_auto(&json)
-        };
-
-        let engine = engine.map_err(|e| {
-            ErrorData::new(
-                ErrorCode::INVALID_PARAMS,
-                format!("Failed to create Cypher engine: {}", e),
-                None,
-            )
-        })?;
-
-        // Get schema info
-        let graph_schema = engine.get_schema();
-
-        // Count nodes
-        let node_count = match engine.execute("MATCH (n) RETURN COUNT(n)") {
-            Ok(r) => match r.get_single_value() {
-                Some(v) => v.as_i64().unwrap_or(0) as usize,
-                None => 0,
-            },
-            Err(_) => 0,
-        };
-
-        // Store the engine
-        let mut store = self.cypher_store.write().await;
-        store.insert(name.clone(), engine);
-
-        let response = cypher::LoadJsonResponse { name, graph_schema, node_count };
-
-        Ok(serde_json::to_string_pretty(&response).unwrap_or_default())
-    }
-
     /// Search Google Patents for patents matching a query
     #[tool(description = "Search Google Patents for patents matching a query")]
     pub async fn search_patents(
@@ -193,12 +189,12 @@ impl PatentHandler {
         Parameters(request): Parameters<SearchPatentsRequest>,
     ) -> Result<String, ErrorData> {
         let options = SearchOptions {
-            query: request.query,
-            assignee: request.assignee,
-            country: request.country,
+            query: request.query.clone(),
+            assignee: request.assignee.clone(),
+            country: request.country.clone(),
             patent_number: None,
-            after_date: request.after,
-            before_date: request.before,
+            after_date: request.after.clone(),
+            before_date: request.before.clone(),
             limit: request.limit,
             language: request.language.clone(),
         };
@@ -228,8 +224,11 @@ impl PatentHandler {
 
         // Auto-load into Cypher for querying
         let json_value: Value = serde_json::from_str(&json_str).unwrap_or_default();
-        let dataset_name = Self::generate_dataset_name();
+        let dataset_name = Self::dataset_name_from_request(&request);
         let graph_schema = self.load_to_cypher(dataset_name.clone(), &json_value).await;
+
+        // Evict old datasets if exceeding max cache size
+        self.evict_old_datasets().await;
 
         let output_file = output_path.to_str().unwrap().to_string();
         let summary = SearchResultSummary {
@@ -330,8 +329,11 @@ impl PatentHandler {
 
             // Auto-load into Cypher for querying
             let json_value: Value = serde_json::from_str(&json_str).unwrap_or_default();
-            let dataset_name = Self::generate_dataset_name();
+            let dataset_name = Self::dataset_name_from_fetch(&request.patent_id);
             let graph_schema = self.load_to_cypher(dataset_name.clone(), &json_value).await;
+
+            // Evict old datasets if exceeding max cache size
+            self.evict_old_datasets().await;
 
             let summary = FetchResultSummary {
                 output_file: output_path.to_str().unwrap().to_string(),
@@ -376,95 +378,6 @@ impl PatentHandler {
         let row_count = results.as_array().map(|a| a.len()).unwrap_or(0);
 
         let response = cypher::ExecuteCypherResponse { results, row_count };
-
-        Ok(serde_json::to_string_pretty(&response).unwrap_or_default())
-    }
-
-    /// List all loaded patent datasets
-    #[tool(description = "List all loaded patent datasets")]
-    pub async fn list_patent_datasets(
-        &self,
-        _parameters: Parameters<cypher::ListDatasetsRequest>,
-    ) -> Result<String, ErrorData> {
-        let store = self.cypher_store.read().await;
-        let datasets: Vec<String> = store.keys().cloned().collect();
-
-        let response = cypher::ListDatasetsResponse { datasets, count: store.len() };
-
-        Ok(serde_json::to_string_pretty(&response).unwrap_or_default())
-    }
-
-    /// Load JSON file for Cypher querying
-    #[tool(description = "Load JSON file and create a queryable dataset with auto-detected schema")]
-    pub async fn load_json_file(
-        &self,
-        Parameters(request): Parameters<cypher::LoadJsonFileRequest>,
-    ) -> Result<String, ErrorData> {
-        // Read JSON from file
-        let file_content = tokio::fs::read_to_string(&request.file_path).await.map_err(|e| {
-            ErrorData::new(
-                ErrorCode::INVALID_PARAMS,
-                format!("Failed to read file '{}': {}", request.file_path, e),
-                None,
-            )
-        })?;
-
-        let json: Value = serde_json::from_str(&file_content).map_err(|e| {
-            ErrorData::new(ErrorCode::INVALID_PARAMS, format!("Failed to parse JSON: {}", e), None)
-        })?;
-
-        // Load using internal method
-        self.load_json_data_internal(
-            request.name,
-            json,
-            request.node_path,
-            request.id_field,
-            request.label_field,
-            request.relation_fields,
-        )
-        .await
-    }
-
-    /// Load JSON data directly for Cypher querying
-    #[tool(
-        description = "Load JSON data directly and create a queryable dataset with auto-detected schema"
-    )]
-    pub async fn load_json_data(
-        &self,
-        Parameters(request): Parameters<cypher::LoadJsonDataRequest>,
-    ) -> Result<String, ErrorData> {
-        self.load_json_data_internal(
-            request.name,
-            request.json,
-            request.node_path,
-            request.id_field,
-            request.label_field,
-            request.relation_fields,
-        )
-        .await
-    }
-
-    /// Unload a dataset
-    #[tool(description = "Unload a JSON dataset from memory")]
-    pub async fn unload_dataset(
-        &self,
-        Parameters(request): Parameters<cypher::UnloadDatasetRequest>,
-    ) -> Result<String, ErrorData> {
-        let mut store = self.cypher_store.write().await;
-        let existed = store.remove(&request.name).is_some();
-
-        if !existed {
-            return Err(ErrorData::new(
-                ErrorCode::INVALID_PARAMS,
-                format!("Dataset '{}' not found", request.name),
-                None,
-            ));
-        }
-
-        let response = cypher::UnloadDatasetResponse {
-            message: format!("Dataset '{}' unloaded successfully", request.name),
-            name: request.name,
-        };
 
         Ok(serde_json::to_string_pretty(&response).unwrap_or_default())
     }
