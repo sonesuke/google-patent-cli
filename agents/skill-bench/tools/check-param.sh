@@ -13,9 +13,9 @@ if [ -z "$LOG_FILE" ] || [ -z "$TOOL_NAME" ] || [ -z "$PARAM_NAME" ]; then
 fi
 
 if [ -n "$EXPECTED_VALUE" ]; then
-    # Check if parameter equals expected value
-    jq -s "[.[] | select(.type == \"assistant\") | .message.content[]? | select(type == \"object\" and .type == \"tool_use\" and .name == \"$TOOL_NAME\") | .input.$PARAM_NAME == \"$EXPECTED_VALUE\"] | any" "$LOG_FILE"
+    # Check if parameter equals expected value (handle both string and array)
+    jq -s "[.[] | select(.type == \"assistant\") | .message.content[]? | select(type == \"object\" and .type == \"tool_use\") | select(.name | test(\"$TOOL_NAME\"; \"i\")) | .input.$PARAM_NAME | (if type == \"array\" then .[] == \"$EXPECTED_VALUE\" else . == \"$EXPECTED_VALUE\" end)] | any" "$LOG_FILE"
 else
     # Check if parameter exists
-    jq -s "[.[] | select(.type == \"assistant\") | .message.content[]? | select(type == \"object\" and .type == \"tool_use\" and .name == \"$TOOL_NAME\") | .input.$PARAM_NAME] | length > 0" "$LOG_FILE"
+    jq -s "[.[] | select(.type == \"assistant\") | .message.content[]? | select(type == \"object\" and .type == \"tool_use\") | select(.name | test(\"$TOOL_NAME\"; \"i\")) | .input.$PARAM_NAME] | length > 0" "$LOG_FILE"
 fi

@@ -31,4 +31,4 @@ command = "check-mcp-success.sh fetch_patent"
 [[checks]]
 name = "raw_parameter_used"
 type = "script"
-command = "check-param.sh \"\" fetch_patent raw true"
+command = "check-param.sh fetch_patent raw true"

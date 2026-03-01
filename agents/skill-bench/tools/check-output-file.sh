@@ -10,4 +10,5 @@ if [ -z "$LOG_FILE" ]; then
 fi
 
 # Check if output_file exists in tool_result content
-jq -s '[.[] | select(.type == "user") | .message.content[]? | select(type == "object" and .type == "tool_result" and .tool_use_id? and .content? != null) | .content | fromjson | .output_file] | length > 0' "$LOG_FILE"
+# Use try/catch to handle invalid JSON in content field
+jq -s '[.[] | select(.type == "user") | .message.content[]? | select(type == "object" and .type == "tool_result" and .tool_use_id? and .content? != null and (.content | type) == "string") | .content | try fromjson catch null | select(. != null) | .output_file] | length > 0' "$LOG_FILE"

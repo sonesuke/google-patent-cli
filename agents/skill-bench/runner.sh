@@ -102,7 +102,8 @@ for IDX in "${!TEST_FILES[@]}"; do
     echo "[SkillBench]   Running trial → $LOG_FILE"
     START_TIME=$(date +%s)
 
-    (cd "$WORK_DIR" && claude -p \
+    # Unset CLAUDECODE to avoid nested session error
+    (cd "$WORK_DIR" && unset CLAUDECODE && claude -p \
         --dangerously-skip-permissions \
         --verbose \
         --output-format stream-json \
@@ -131,11 +132,28 @@ for IDX in "${!TEST_FILES[@]}"; do
         CHECK_NAME=$(yq eval ".checks[$CHECK_IDX].name" "$TEST_FILE")
         CHECK_CMD=$(yq eval ".checks[$CHECK_IDX].command" "$TEST_FILE")
 
-        if $TOOLS_DIR/$CHECK_CMD "$LOG_FILE" >/dev/null 2>&1; then
-            echo "[SkillBench]     ✅ $CHECK_NAME"
+        # Parse check command into script and args
+        # Use eval to properly handle quoted arguments
+        CHECK_SCRIPT=$(echo "$CHECK_CMD" | awk '{print $1}')
+        CHECK_ARGS=$(echo "$CHECK_CMD" | cut -d' ' -f2-)
+
+        if [ -n "$CHECK_ARGS" ]; then
+            # Command has arguments: script.sh arg1 arg2...
+            # Use eval to properly expand quoted arguments
+            if eval "$TOOLS_DIR/$CHECK_SCRIPT \"\$LOG_FILE\" $CHECK_ARGS" >/dev/null 2>&1; then
+                echo "[SkillBench]     ✅ $CHECK_NAME"
+            else
+                echo "[SkillBench]     ❌ $CHECK_NAME"
+                CASE_PASS=false
+            fi
         else
-            echo "[SkillBench]     ❌ $CHECK_NAME"
-            CASE_PASS=false
+            # Command has no arguments: script.sh (takes only LOG_FILE)
+            if $TOOLS_DIR/$CHECK_SCRIPT "$LOG_FILE" >/dev/null 2>&1; then
+                echo "[SkillBench]     ✅ $CHECK_NAME"
+            else
+                echo "[SkillBench]     ❌ $CHECK_NAME"
+                CASE_PASS=false
+            fi
         fi
     done
 

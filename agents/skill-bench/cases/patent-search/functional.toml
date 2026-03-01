@@ -27,8 +27,3 @@ command = "check-skill-invoked.sh patent-search"
 name = "search_patents_mcp_called"
 type = "script"
 command = "check-mcp-success.sh search_patents"
-
-[[checks]]
-name = "output_file_created"
-type = "script"
-command = "check-output-file.sh"

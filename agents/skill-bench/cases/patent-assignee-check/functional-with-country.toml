@@ -31,4 +31,4 @@ command = "check-mcp-success.sh search_patents"
 [[checks]]
 name = "country_parameter_used"
 type = "script"
-command = "check-param.sh \"\" search_patents country \"JP\""
+command = "check-param.sh search_patents country JP"

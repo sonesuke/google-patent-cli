@@ -31,4 +31,4 @@ command = "check-mcp-success.sh search_patents"
 [[checks]]
 name = "company_name_parameter_used"
 type = "script"
-command = "check-param.sh \"\" search_patents assignee \"Google\""
+command = "check-param.sh search_patents assignee Google"
