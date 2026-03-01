@@ -1,0 +1,14 @@
+# Test Case: Patent Assignee Check - Triggering
+
+name = "triggering"
+description = "Verify patent-assignee-check skill is triggered when checking assignee variations"
+timeout = 60
+
+test_prompt = """
+I want to verify the correct assignee name for "Toyota" in patent databases.
+"""
+
+[[checks]]
+name = "patent_assignee_check_skill_invoked"
+type = "script"
+command = "check-skill-invoked.sh patent-assignee-check"
