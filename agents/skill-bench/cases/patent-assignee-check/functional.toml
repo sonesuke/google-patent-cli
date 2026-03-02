@@ -5,7 +5,7 @@ description = "Verify patent-assignee-check skill works for checking variations"
 timeout = 120
 
 test_prompt = """
-Check assignee name variations for "Google".
+Find all spelling variations of Google assignee name in patent databases. Check how Google appears in patents.
 """
 
 [[checks]]

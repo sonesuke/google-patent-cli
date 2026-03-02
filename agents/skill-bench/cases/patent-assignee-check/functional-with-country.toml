@@ -5,7 +5,7 @@ description = "Verify patent-assignee-check skill works with country filter"
 timeout = 120
 
 test_prompt = """
-Check assignee name variations for "Toyota" in Japan (country: JP).
+Find all spelling variations of Toyota assignee name in Japanese patents (country: JP). Check how Toyota appears in patent databases.
 """
 
 [[checks]]
