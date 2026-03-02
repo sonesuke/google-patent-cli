@@ -20,74 +20,25 @@ Retrieve complete patent details including title, abstract, description, claims,
 
 Uses `fetch_patent` MCP tool provided by google-patent-cli.
 
-## Parameters
-
-- `patent_id` (string, required): Patent ID in the format recognized by Google Patents
-  - Examples: "US9152718B2", "JP2023-123456-A", "EP1234567B1"
-- `raw` (boolean, optional): If true, returns raw HTML instead of structured JSON
-- `language` (string, optional): Language/locale for patent pages (ja, en, zh)
-
 ## Usage
 
-### Fetch patent details (JSON)
+Fetch a patent, then use the returned `dataset` name to query with Cypher:
 
 ```
 patent_fetch({
   patent_id: "US9152718B2"
 })
-```
 
-### Fetch patent with language
-
-```
-patent_fetch({
-  patent_id: "JP2023123456A",
-  language: "en"
+# Returns dataset name like "fetch-abc123"
+# Then query with execute_cypher:
+execute_cypher({
+  dataset: "fetch-abc123",
+  query: "MATCH (p:Patent) RETURN p.title, p.abstract_text, p.assignee"
 })
 ```
 
-### Fetch raw HTML (for debugging)
+## Parameters
 
-```
-patent_fetch({
-  patent_id: "US9152718B2",
-  raw: true
-})
-```
-
-## Response Format
-
-### JSON mode (raw: false or omitted)
-
-Returns a JSON object containing:
-
-- `dataset`: **Dataset name** for Cypher queries (patent data is auto-loaded into Cypher store)
-- `graph_schema`: **Graph schema** for constructing Cypher queries
-- `output_file`: Path to the JSON file (for reference/debugging)
-- `schema`: JSON schema of the patent data
-
-The patent data includes:
-- `id`: Patent ID
-- `title`: Patent title
-- `abstract_text`: Abstract text
-- `description_paragraphs`: Full description (array of paragraphs)
-- `claims`: Claims text
-- `assignee`: Assignee/Applicant name
-- `filing_date`: Filing date
-- `priority_date`: Priority date
-- `legal_status`: Legal status (if available)
-- `citations`: Cited patents
-- `images`: Patent images/figures
-
-### HTML mode (raw: true)
-
-Returns a JSON object containing:
-
-- `output_file`: Path to the HTML file
-- `schema`: Schema (string type for HTML)
-
-## Notes
-
-- Patent details are **automatically loaded into Cypher store** for querying (JSON mode only)
-- Use standard patent ID formats recognized by Google Patents
-- Raw HTML mode is useful for debugging or when you need the full page source
+- `patent_id` (string, required): Patent ID (e.g., "US9152718B2", "JP2023-123456-A")
+- `raw` (boolean, optional): If true, returns raw HTML instead of structured data
+- `language` (string, optional): Language/locale for patent pages (ja, en, zh)
