@@ -61,10 +61,10 @@ patent_fetch({
 
 Returns a JSON object containing:
 
-- `output_file`: Path to the JSON file with patent details
+- `dataset`: **Dataset name** for Cypher queries (patent data is auto-loaded into Cypher store)
+- `graph_schema`: **Graph schema** for constructing Cypher queries
+- `output_file`: Path to the JSON file (for reference/debugging)
 - `schema`: JSON schema of the patent data
-- `dataset`: Dataset name for Cypher queries (optional)
-- `graph_schema`: Graph schema for Cypher queries (optional)
 
 The patent data includes:
 - `id`: Patent ID
@@ -88,6 +88,6 @@ Returns a JSON object containing:
 
 ## Notes
 
-- Patent details are automatically loaded into Cypher store for further querying
+- Patent details are **automatically loaded into Cypher store** for querying (JSON mode only)
 - Use standard patent ID formats recognized by Google Patents
 - Raw HTML mode is useful for debugging or when you need the full page source
