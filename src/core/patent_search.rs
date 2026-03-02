@@ -6,7 +6,6 @@ use async_trait::async_trait;
 #[async_trait]
 pub trait PatentSearch: Send + Sync {
     async fn search(&self, options: &SearchOptions) -> Result<SearchResult>;
-    async fn get_raw_html(&self, patent_number: &str, language: Option<&str>) -> Result<String>;
 }
 
 pub struct PatentSearcher {
@@ -19,37 +18,6 @@ impl PatentSearch for PatentSearcher {
     /// Search for patents or fetch a specific patent
     async fn search(&self, options: &SearchOptions) -> Result<SearchResult> {
         self.search_internal(options).await
-    }
-
-    /// Get raw HTML for a patent page (for debugging)
-    async fn get_raw_html(&self, patent_number: &str, language: Option<&str>) -> Result<String> {
-        let url = language.map_or_else(
-            || format!("https://patents.google.com/patent/{}", patent_number),
-            |lang| format!("https://patents.google.com/patent/{}?hl={}", patent_number, lang),
-        );
-        let browser = self.browser_manager.get_browser().await?;
-        let page_ws_url = browser.new_page().await?;
-        let page = CdpPage::new(&page_ws_url).await?;
-
-        page.goto(&url).await?;
-
-        // Wait for page to load (meta description)
-        let loaded =
-            page.wait_for_element("meta[name='description'], meta[name='DC.title']", 15).await?;
-        if !loaded {
-            return Err(Error::Search("Page failed to load within timeout".to_string()));
-        }
-        // Additional wait for description paragraphs, claims, and images to appear
-        let _ = page
-            .wait_for_element(
-                "div.description-line[num], div.claim[num], img[src*='patentimages']",
-                15,
-            )
-            .await?;
-
-        let html = page.get_html().await?;
-        let _ = page.close().await;
-        Ok(html)
     }
 }
 

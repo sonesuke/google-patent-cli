@@ -1,6 +1,6 @@
 ---
 name: patent-search
-description: "Search for patents from Google Patents by query, assignee, country, and/or date range."
+description: "Search for patents by query, assignee, country, or date range. Use this skill to find patents matching specific criteria from Google Patents."
 metadata:
   author: sonesuke
   version: 1.0.0

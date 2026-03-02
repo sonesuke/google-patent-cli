@@ -71,10 +71,6 @@ pub struct FetchArgs {
     /// Patent ID (e.g., US1234567)
     pub patent_id: String,
 
-    /// Output raw HTML instead of JSON (for debugging)
-    #[arg(long)]
-    pub raw: bool,
-
     /// Run with visible browser window (default is headless)
     #[arg(long, default_value_t = false)]
     pub head: bool,
@@ -178,28 +174,23 @@ pub async fn run_app(cli: Cli) -> Result<()> {
             )
             .await?;
 
-            if args.raw {
-                let html = searcher.get_raw_html(&args.patent_id, args.language.as_deref()).await?;
-                println!("{}", html);
+            let options = SearchOptions {
+                query: None,
+                assignee: None,
+                country: None,
+                patent_number: Some(args.patent_id.clone()),
+                after_date: None,
+                before_date: None,
+                limit: None,
+                language: args.language,
+            };
+            let mut results = searcher.search(&options).await?;
+            if let Some(patent) = results.patents.pop() {
+                let json = serde_json::to_string_pretty(&patent)?;
+                println!("{}", json);
             } else {
-                let options = SearchOptions {
-                    query: None,
-                    assignee: None,
-                    country: None,
-                    patent_number: Some(args.patent_id.clone()),
-                    after_date: None,
-                    before_date: None,
-                    limit: None,
-                    language: args.language,
-                };
-                let mut results = searcher.search(&options).await?;
-                if let Some(patent) = results.patents.pop() {
-                    let json = serde_json::to_string_pretty(&patent)?;
-                    println!("{}", json);
-                } else {
-                    eprintln!("No patent found with ID: {}", args.patent_id);
-                    std::process::exit(1);
-                }
+                eprintln!("No patent found with ID: {}", args.patent_id);
+                std::process::exit(1);
             }
         }
     }
