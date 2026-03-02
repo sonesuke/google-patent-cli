@@ -30,15 +30,31 @@ Google Patent CLI — A Rust-based command-line tool for searching and fetching 
 ```
 src/                    # Rust source code
 e2e/                    # E2E tests (CLI-level, using assert_cmd)
-agents/pr-healer/       # PR-Healer autonomous agent
-  healer.sh             # Host-side daemon loop
-  prompt.txt            # Agent instructions
-  tools/                # Agent tools
-    load-progress.sh    # Read past context (JSONL)
-    record-progress.sh  # Write progress logs (JSONL)
+agents/
+  pr-healer/            # PR-Healer autonomous agent
+    healer.sh           # Host-side daemon loop
+    prompt.txt          # Agent instructions
+    tools/              # Agent tools
+      load-progress.sh  # Read past context (JSONL)
+      record-progress.sh # Write progress logs (JSONL)
+  skill-bench/          # Claude Code Skill testing framework
+    runner.sh           # Test runner
+    cases/              # Test case definitions (TOML, test prompts in English)
+    tools/              # Check scripts for validating test results
+    logs/               # Test execution logs
+claude-plugin/          # Claude Code Plugin structure
+  skills/               # Individual skill definitions
 mise.toml               # Task definitions (fmt, clippy, test, pre-commit)
 .devcontainer/          # Dev container configuration
 ```
+
+## Skill-Bench Testing
+
+`agents/skill-bench/` contains the testing framework for Claude Code skills:
+
+- **Test cases are in English** - All `test_prompt` values in TOML files must be English
+- **Run tests**: `./agents/skill-bench/runner.sh` (executes inside container)
+- **Test pattern**: `./agents/skill-bench/runner.sh "cases/*/*.toml"`
 
 ## Tools
 

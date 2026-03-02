@@ -1,0 +1,17 @@
+{
+  "name": "google-patent-cli-marketplace",
+  "owner": {
+    "name": "sonesuke"
+  },
+  "plugins": [
+    {
+      "name": "google-patent-cli",
+      "description": "Google Patent CLI - Search and analyze patents from Google Patents",
+      "version": "0.1.0",
+      "author": {
+        "name": "sonesuke"
+      },
+      "source": "./claude-plugin"
+    }
+  ]
+}

@@ -123,6 +123,31 @@ pub struct FetchResultSummary {
     pub dataset: Option<String>,
 }
 
+/// Request parameters for patent analyzer skill
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct PatentAnalyzerRequest {
+    #[schemars(description = "The analysis action to perform")]
+    pub action: String,
+
+    #[schemars(description = "Search query (for search, analyze_assignees, prior_art)")]
+    pub query: Option<String>,
+
+    #[schemars(description = "Patent ID (for fetch action)")]
+    pub patent_id: Option<String>,
+
+    #[schemars(description = "Assignee/Applicant name (for search, check_spelling)")]
+    pub assignee: Option<String>,
+
+    #[schemars(description = "Country code (JP, US, CN)")]
+    pub country: Option<String>,
+
+    #[schemars(description = "Maximum number of results (default: 10)")]
+    pub limit: Option<usize>,
+
+    #[schemars(description = "Return raw HTML (for fetch action)")]
+    pub raw: Option<bool>,
+}
+
 /// MCP handler for Google Patent CLI
 #[derive(Clone)]
 pub struct PatentHandler {

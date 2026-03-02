@@ -1,0 +1,14 @@
+{
+  "name": "google-patent-cli",
+  "description": "Google Patent CLI - Search and analyze patents from Google Patents with MCP integration",
+  "version": "0.1.0",
+  "author": {
+    "name": "sonesuke"
+  },
+  "mcpServers": {
+    "google-patent-cli": {
+      "command": "google-patent-cli",
+      "args": ["mcp"]
+    }
+  }
+}

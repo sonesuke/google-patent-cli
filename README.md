@@ -46,7 +46,8 @@ cargo install --path .
 |---|---|---|
 | `search_patents` | Search Google Patents matching a query, assignee, and date filters. | `query`, `assignee`, `limit`, `before`, `after`, `country`, `language` |
 | `fetch_patent` | Fetch details (metadata, description, claims) of a specific patent. | `patent_id` (required, e.g., "US9152718B2"), `language`, `raw` |
- 
+| `execute_cypher` | Execute a Cypher query on a loaded patent dataset. | `dataset` (required), `query` (required) |
+
 ### Usage
 To start the MCP server over `stdio`:
 ```bash
@@ -67,7 +68,41 @@ Add this to your `claude_desktop_config.json`:
   }
 }
 ```
- 
+
+## Claude Code Plugin
+
+`google-patent-cli` is also available as a [Claude Code Plugin](https://github.com/anthropics/claude-code/tree/main/docs/plugins.md) from the marketplace.
+
+### Installation
+
+Install the plugin using the Claude Code CLI:
+
+```bash
+claude plugin marketplace add sonesuke/google-patent-cli
+```
+
+### Available Skills
+
+| Skill | Description |
+|---|---|
+| `patent-search` | Search and analyze patents from Google Patents. Supports keyword search, assignee filtering, country filtering, date range filtering, and fetching patent details. |
+| `patent-analysis` | Analyze patent search results using Cypher queries on datasets loaded by the patent-search skill. |
+
+### Usage
+
+Once installed, you can use the skills directly in Claude Code:
+
+```bash
+# Search for patents
+/patent-search action:search query:"machine learning" limit:10
+
+# Fetch patent details
+/patent-search action:fetch patent_id:"US9152718B2"
+
+# Analyze search results
+/patent-analysis dataset:"search-abc123" analysis_type:count_by_assignee
+```
+
 ## CLI Usage
  
 ### CLI Commands

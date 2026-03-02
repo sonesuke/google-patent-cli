@@ -1,0 +1,34 @@
+# Test Case: Patent Assignee Check - With Country
+
+name = "check-with-country"
+description = "Verify patent-assignee-check skill works with country filter"
+timeout = 120
+
+test_prompt = """
+Find all spelling variations of Toyota assignee name in Japanese patents (country: JP). Check how Toyota appears in patent databases.
+"""
+
+[[checks]]
+name = "mcp_server_loaded"
+type = "script"
+command = "check-mcp-loaded.sh google-patent-cli"
+
+[[checks]]
+name = "skill_loaded"
+type = "script"
+command = "check-skill-loaded.sh patent-assignee-check"
+
+[[checks]]
+name = "patent_assignee_check_skill_invoked"
+type = "script"
+command = "check-skill-invoked.sh patent-assignee-check"
+
+[[checks]]
+name = "search_patents_mcp_called"
+type = "script"
+command = "check-mcp-success.sh search_patents"
+
+[[checks]]
+name = "country_parameter_used"
+type = "script"
+command = "check-param.sh search_patents country JP"

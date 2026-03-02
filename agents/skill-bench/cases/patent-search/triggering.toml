@@ -1,0 +1,24 @@
+# Test Case: Patent Search - Triggering
+
+name = "triggering"
+description = "Verify patent-search skill is triggered when searching for patents"
+timeout = 60
+
+test_prompt = """
+I need to search for patents about artificial intelligence.
+"""
+
+[[checks]]
+name = "mcp_server_loaded"
+type = "script"
+command = "check-mcp-loaded.sh google-patent-cli"
+
+[[checks]]
+name = "skill_loaded"
+type = "script"
+command = "check-skill-loaded.sh patent-search"
+
+[[checks]]
+name = "patent_search_skill_invoked"
+type = "script"
+command = "check-skill-invoked.sh patent-search"
