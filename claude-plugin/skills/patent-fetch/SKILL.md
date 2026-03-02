@@ -40,5 +40,4 @@ execute_cypher({
 ## Parameters
 
 - `patent_id` (string, required): Patent ID (e.g., "US9152718B2", "JP2023-123456-A")
-- `raw` (boolean, optional): If true, returns raw HTML instead of structured data
 - `language` (string, optional): Language/locale for patent pages (ja, en, zh)

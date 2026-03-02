@@ -43,7 +43,19 @@ execute_cypher({
 - `query` (string, optional): Free-text search query
 - `assignee` (array of strings, optional): Filter by assignee/applicant names
 - `country` (string, optional): Filter by country code (JP, US, CN, EP)
-- `after` (string, optional): Filter by priority date after (YYYY-MM-DD)
-- `before` (string, optional): Filter by priority date before (YYYY-MM-DD)
+
+### Date Filters
+
+Three independent date filters are available:
+
+- `priority_after` (string, optional): Filter by priority date after (YYYY-MM-DD)
+- `priority_before` (string, optional): Filter by priority date before (YYYY-MM-DD)
+- `publication_after` (string, optional): Filter by publication date after (YYYY-MM-DD)
+- `publication_before` (string, optional): Filter by publication date before (YYYY-MM-DD)
+- `filing_after` (string, optional): Filter by filing date after (YYYY-MM-DD)
+- `filing_before` (string, optional): Filter by filing date before (YYYY-MM-DD)
+
+### Other Parameters
+
 - `limit` (number, optional): Maximum number of results (default: 10)
 - `language` (string, optional): Language/locale (ja, en, zh)
