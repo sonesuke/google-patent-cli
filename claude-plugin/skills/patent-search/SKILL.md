@@ -1,6 +1,6 @@
 ---
 name: patent-search
-description: "I need to find patents on Google Patents. Use this when the user wants to search for, discover, or research patents by topic, company, assignee, country, or date. This skill provides a comprehensive search interface with filtering options."
+description: "Search and analyze patents from Google Patents with flexible filters including query, assignee, country, and date range. Use when the user wants to find, discover, or research patents by topic, company, technology, or assignee name."
 metadata:
   author: sonesuke
   version: 1.0.0
