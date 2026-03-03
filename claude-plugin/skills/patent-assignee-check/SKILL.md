@@ -1,6 +1,6 @@
 ---
 name: patent-assignee-check
-description: "Identify and verify assignee name spelling variations in patent databases. Check how a company name appears across patents (e.g., Google Inc vs Google LLC)."
+description: "I need to verify how a company name appears in patent databases. Use this when the user wants to find all spelling variations and official assignee names (e.g., 'Google Inc.' vs 'Google LLC' vs 'Alphabet Inc.') to ensure comprehensive patent searches."
 metadata:
   author: sonesuke
   version: 1.0.0

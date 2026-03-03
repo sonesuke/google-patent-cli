@@ -1,6 +1,6 @@
 ---
 name: patent-fetch
-description: "Fetch detailed patent information by patent ID from Google Patents."
+description: "I need to get complete details for a specific patent. Use this when the user provides a patent ID and wants full information including title, abstract, claims, description, assignee, filing dates, and legal status."
 metadata:
   author: sonesuke
   version: 1.0.0
