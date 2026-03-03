@@ -80,10 +80,6 @@ pub struct FetchPatentRequest {
     #[schemars(description = "The patent ID (e.g., 'US9152718B2')")]
     pub patent_id: String,
 
-    #[schemars(description = "If true, returns the raw HTML of the patent page")]
-    #[serde(default)]
-    pub raw: bool,
-
     #[schemars(description = "Language/locale for patent pages (e.g., 'ja', 'en', 'zh')")]
     pub language: Option<String>,
 }
@@ -272,102 +268,60 @@ impl PatentHandler {
         &self,
         Parameters(request): Parameters<FetchPatentRequest>,
     ) -> Result<String, ErrorData> {
-        if request.raw {
-            // Raw HTML mode - write to file and return summary
-            let html = self
-                .searcher
-                .get_raw_html(&request.patent_id, request.language.as_deref())
-                .await
-                .map_err(|e| {
-                    ErrorData::new(
-                        ErrorCode::INTERNAL_ERROR,
-                        format!("Failed to fetch raw HTML: {}", e),
-                        None,
-                    )
-                })?;
+        let options = SearchOptions {
+            query: None,
+            assignee: None,
+            country: None,
+            patent_number: Some(request.patent_id.clone()),
+            after_date: None,
+            before_date: None,
+            limit: None,
+            language: request.language,
+        };
+        let mut results = self.searcher.search(&options).await.map_err(|e| {
+            ErrorData::new(ErrorCode::INTERNAL_ERROR, format!("Fetch failed: {}", e), None)
+        })?;
 
-            // Schema for HTML (string type)
-            let schema = serde_json::json!({
-                "type": "string",
-                "description": "Raw HTML of the patent page"
-            });
+        let patent = results.patents.pop().ok_or_else(|| {
+            ErrorData::new(
+                ErrorCode::INVALID_PARAMS,
+                format!("No patent found with ID: {}", request.patent_id),
+                None,
+            )
+        })?;
 
-            // Create temp file and write HTML
-            let temp_dir = std::env::temp_dir();
-            let file_name = format!("patent-{}.html", uuid::Uuid::new_v4());
-            let output_path = temp_dir.join(&file_name);
+        // Generate JSON schema for Patent
+        let schema = schema_for!(Patent);
 
-            tokio::fs::write(&output_path, html).await.map_err(|e| {
-                ErrorData::new(
-                    ErrorCode::INTERNAL_ERROR,
-                    format!("Failed to write to file {}: {}", output_path.display(), e),
-                    None,
-                )
-            })?;
+        // Create temp file and write results
+        let temp_dir = std::env::temp_dir();
+        let file_name = format!("patent-{}.json", uuid::Uuid::new_v4());
+        let output_path = temp_dir.join(&file_name);
+        let json_str = serde_json::to_string_pretty(&patent).unwrap_or_default();
 
-            let summary = FetchResultSummary {
-                output_file: output_path.to_str().unwrap().to_string(),
-                schema,
-                graph_schema: None,
-                dataset: None,
-            };
-            Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
-        } else {
-            let options = SearchOptions {
-                query: None,
-                assignee: None,
-                country: None,
-                patent_number: Some(request.patent_id.clone()),
-                after_date: None,
-                before_date: None,
-                limit: None,
-                language: request.language,
-            };
-            let mut results = self.searcher.search(&options).await.map_err(|e| {
-                ErrorData::new(ErrorCode::INTERNAL_ERROR, format!("Fetch failed: {}", e), None)
-            })?;
+        tokio::fs::write(&output_path, &json_str).await.map_err(|e| {
+            ErrorData::new(
+                ErrorCode::INTERNAL_ERROR,
+                format!("Failed to write to file {}: {}", output_path.display(), e),
+                None,
+            )
+        })?;
 
-            let patent = results.patents.pop().ok_or_else(|| {
-                ErrorData::new(
-                    ErrorCode::INVALID_PARAMS,
-                    format!("No patent found with ID: {}", request.patent_id),
-                    None,
-                )
-            })?;
+        // Auto-load into Cypher for querying
+        let json_value: Value = serde_json::from_str(&json_str).unwrap_or_default();
+        let dataset_name = Self::dataset_name_from_fetch(&request.patent_id);
+        let graph_schema = self.load_to_cypher(dataset_name.clone(), &json_value).await;
 
-            // Generate JSON schema for Patent
-            let schema = schema_for!(Patent);
+        // Evict old datasets if exceeding max cache size
+        self.evict_old_datasets().await;
 
-            // Create temp file and write results
-            let temp_dir = std::env::temp_dir();
-            let file_name = format!("patent-{}.json", uuid::Uuid::new_v4());
-            let output_path = temp_dir.join(&file_name);
-            let json_str = serde_json::to_string_pretty(&patent).unwrap_or_default();
-
-            tokio::fs::write(&output_path, &json_str).await.map_err(|e| {
-                ErrorData::new(
-                    ErrorCode::INTERNAL_ERROR,
-                    format!("Failed to write to file {}: {}", output_path.display(), e),
-                    None,
-                )
-            })?;
-
-            // Auto-load into Cypher for querying
-            let json_value: Value = serde_json::from_str(&json_str).unwrap_or_default();
-            let dataset_name = Self::dataset_name_from_fetch(&request.patent_id);
-            let graph_schema = self.load_to_cypher(dataset_name.clone(), &json_value).await;
-
-            // Evict old datasets if exceeding max cache size
-            self.evict_old_datasets().await;
-
-            let summary = FetchResultSummary {
-                output_file: output_path.to_str().unwrap().to_string(),
-                schema: serde_json::to_value(schema).unwrap(),
-                graph_schema,
-                dataset: Some(dataset_name),
-            };
-            Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
-        }
+        let summary = FetchResultSummary {
+            output_file: output_path.to_str().unwrap().to_string(),
+            schema: serde_json::to_value(schema).unwrap(),
+            graph_schema,
+            dataset: Some(dataset_name),
+        };
+        Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
     }
 
     /// Execute Cypher query on loaded patent dataset
@@ -502,17 +456,6 @@ mod tests {
                 top_cpcs: None,
             })
         }
-
-        async fn get_raw_html(
-            &self,
-            patent_number: &str,
-            _language: Option<&str>,
-        ) -> crate::core::Result<String> {
-            if patent_number == "FAIL" {
-                return Err(crate::core::Error::Other("Mock failure".to_string()));
-            }
-            Ok(format!("<html>{}</html>", patent_number))
-        }
     }
 
     #[tokio::test]
@@ -552,9 +495,8 @@ mod tests {
     async fn test_fetch_patent() {
         let handler = PatentHandler::new(Arc::new(MockSearcher));
 
-        // Success case (JSON mode)
-        let request =
-            FetchPatentRequest { patent_id: "US123".to_string(), raw: false, language: None };
+        // Success case
+        let request = FetchPatentRequest { patent_id: "US123".to_string(), language: None };
         let result = handler.fetch_patent(Parameters(request)).await;
         assert!(result.is_ok());
         let result_str = result.unwrap();
@@ -566,43 +508,19 @@ mod tests {
         let summary: FetchResultSummary = serde_json::from_str(&result_str).unwrap();
         assert!(summary.output_file.starts_with('/')); // Absolute path
         assert!(summary.schema.is_object()); // Schema is a JSON object
-
-        // Clean up
-        let _ = tokio::fs::remove_file(&summary.output_file).await;
-
-        // Raw HTML case - also writes to file and returns summary
-        let request =
-            FetchPatentRequest { patent_id: "US123".to_string(), raw: true, language: None };
-        let result = handler.fetch_patent(Parameters(request)).await;
-        assert!(result.is_ok());
-        let result_str = result.unwrap();
-
-        // Should contain summary with file path and schema
-        assert!(result_str.contains("\"output_file\""));
-        assert!(result_str.contains("\"schema\""));
-
-        let summary: FetchResultSummary = serde_json::from_str(&result_str).unwrap();
-        assert!(summary.output_file.starts_with('/')); // Absolute path
-        assert!(summary.schema.is_object()); // Schema is a JSON object
-
-        // Verify HTML file
-        let file_content = tokio::fs::read_to_string(&summary.output_file).await.unwrap();
-        assert!(file_content.contains("<html>US123</html>"));
 
         // Clean up
         let _ = tokio::fs::remove_file(&summary.output_file).await;
 
         // Not found case
-        let request =
-            FetchPatentRequest { patent_id: "NONE".to_string(), raw: false, language: None };
+        let request = FetchPatentRequest { patent_id: "NONE".to_string(), language: None };
         let result = handler.fetch_patent(Parameters(request)).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.message.contains("No patent found"));
 
         // Error case
-        let request =
-            FetchPatentRequest { patent_id: "FAIL".to_string(), raw: false, language: None };
+        let request = FetchPatentRequest { patent_id: "FAIL".to_string(), language: None };
         let result = handler.fetch_patent(Parameters(request)).await;
         assert!(result.is_err());
         let err = result.unwrap_err();

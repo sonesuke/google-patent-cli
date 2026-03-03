@@ -73,15 +73,6 @@ fn test_head_flag_exists() {
         .stdout(predicate::str::contains("--head"));
 }
 
-#[test]
-fn test_raw_flag_exists() {
-    cargo_bin_cmd!("google-patent-cli")
-        .args(["fetch", "--help"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("--raw"));
-}
-
 // ============ Execution tests (Real network/browser) ============
 // Note: These tests depend on a working network and Chrome/Chromium installation.
 // We use small limits and specific IDs to keep them fast.
@@ -105,13 +96,4 @@ fn test_fetch_execution() {
         .success()
         .stdout(predicate::str::contains("\"title\""))
         .stdout(predicate::str::contains("\"US9152718B2\""));
-}
-
-#[test]
-fn test_fetch_raw_execution() {
-    cargo_bin_cmd!("google-patent-cli")
-        .args(["fetch", "US9152718B2", "--raw"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("<html").or(predicate::str::contains("<HTML")));
 }

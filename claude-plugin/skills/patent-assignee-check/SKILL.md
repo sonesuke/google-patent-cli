@@ -1,6 +1,6 @@
 ---
 name: patent-assignee-check
-description: "Identify and verify assignee name spelling variations in patent databases. Check how a company name appears across patents (e.g., Google Inc vs Google LLC)."
+description: "Discover all spelling variations and official assignee names for a company in patent databases. Use when verifying how a company name appears across patents (e.g., 'Google Inc.' vs 'Google LLC' vs 'Alphabet Inc.') to ensure comprehensive patent searches by capturing all name variations."
 metadata:
   author: sonesuke
   version: 1.0.0
@@ -20,74 +20,29 @@ Identify spelling variations and official assignee names for a given company in 
 
 Uses `search_patents` MCP tool provided by google-patent-cli.
 
-## Parameters
-
-- `company_name` (string, required): Company name to check
-- `country` (string, optional): Filter by country code to narrow results
-- `limit` (number, optional): Maximum results for analysis (default: 100)
-
 ## Usage
 
-### Check assignee variations
-
-```
-patent_assignee_check({
-  company_name: "Google"
-})
-```
-
-### Check with country filter
+Search for patents by assignee to find name variations, then use Cypher to analyze:
 
 ```
 patent_assignee_check({
   company_name: "Toyota",
-  country: "JP",
-  limit: 200
+  country: "JP"
+})
+
+# Returns dataset name like "search-abc123"
+# Then query with execute_cypher to find variations:
+execute_cypher({
+  dataset: "search-abc123",
+  query: "MATCH (p:Patent) RETURN p.assignee, count(*) ORDER BY count(*) DESC"
 })
 ```
 
-## Process
+## Parameters
 
-1. **Search**: Execute `search_patents` with the assignee parameter
-2. **Analyze**: Extract and group assignee names from results
-3. **Frequency**: Calculate frequency of each assignee name variation
-4. **Report**: Return top variations with counts
-
-## Response Format
-
-Returns a JSON object containing:
-
-- `company_name`: The input company name
-- `assignee_variations`: Array of assignee name variations found
-  - `assignee`: Assignee name variation
-  - `count`: Number of patents with this assignee name
-  - `percentage`: Percentage of total results
-- `total_results`: Total number of patents analyzed
-- `top_assignee`: Most common assignee name (likely the official name)
-- `dataset`: Dataset name for further Cypher queries
-
-## Example Output
-
-```json
-{
-  "company_name": "Google",
-  "assignee_variations": [
-    {"assignee": "Google LLC", "count": 1250, "percentage": 75.5},
-    {"assignee": "Google Inc.", "count": 350, "percentage": 21.1},
-    {"assignee": "Alphabet Inc.", "count": 55, "percentage": 3.4}
-  ],
-  "total_results": 1655,
-  "top_assignee": "Google LLC",
-  "dataset": "search-abc123"
-}
-```
-
-## Notes
-
-- Results are automatically loaded into Cypher store for further analysis
-- The top assignee by count is likely the official/canonical name
-- All variations should be considered when conducting comprehensive patent searches
-- Use the returned dataset name with `patent-analysis` for further querying
+- `company_name` (string, required): Company name to check for variations
+- `country` (string, optional): Filter by country code (JP, US, CN)
+- `limit` (number, optional): Maximum results (default: 100)
 
 ## Common Variations
 
