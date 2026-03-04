@@ -141,6 +141,7 @@ impl PatentSearcher {
                 if self.verbose {
                     eprintln!("Extracting search results from page...");
                 }
+
                 let results =
                     page.evaluate(include_str!("scripts/extract_search_results.js")).await?;
 

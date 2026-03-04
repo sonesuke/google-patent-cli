@@ -88,8 +88,15 @@ pub struct SearchOptions {
     pub assignee: Option<Vec<String>>,
     pub country: Option<String>,
     pub patent_number: Option<String>,
-    pub after_date: Option<String>,
-    pub before_date: Option<String>,
+    // Priority date filters (earliest filing date)
+    pub priority_after: Option<String>,
+    pub priority_before: Option<String>,
+    // Publication date filters
+    pub publication_after: Option<String>,
+    pub publication_before: Option<String>,
+    // Filing date filters
+    pub filing_after: Option<String>,
+    pub filing_before: Option<String>,
     pub limit: Option<usize>,
     /// Language/locale for the patent page (e.g., "ja", "en", "zh")
     pub language: Option<String>,
@@ -137,12 +144,30 @@ impl SearchOptions {
                 }
             }
 
-            if let Some(after) = &self.after_date {
-                serializer.append_pair("after", after);
+            // Priority date filters
+            // Convert YYYY-MM-DD to YYYYMMDD format for Google Patents
+            if let Some(after) = &self.priority_after {
+                serializer.append_pair("after", &format!("priority:{}", after.replace("-", "")));
+            }
+            if let Some(before) = &self.priority_before {
+                serializer.append_pair("before", &format!("priority:{}", before.replace("-", "")));
             }
 
-            if let Some(before) = &self.before_date {
-                serializer.append_pair("before", before);
+            // Publication date filters
+            if let Some(after) = &self.publication_after {
+                serializer.append_pair("after", &format!("publication:{}", after.replace("-", "")));
+            }
+            if let Some(before) = &self.publication_before {
+                serializer
+                    .append_pair("before", &format!("publication:{}", before.replace("-", "")));
+            }
+
+            // Filing date filters
+            if let Some(after) = &self.filing_after {
+                serializer.append_pair("after", &format!("filing:{}", after.replace("-", "")));
+            }
+            if let Some(before) = &self.filing_before {
+                serializer.append_pair("before", &format!("filing:{}", before.replace("-", "")));
             }
 
             if let Some(language) = &self.language {
@@ -305,17 +330,18 @@ mod tests {
         };
         assert_eq!(options.to_url().unwrap(), "https://patents.google.com/?q=foo&country=US");
 
-        // Test query with dates
+        // Test query with priority dates
         let options = SearchOptions {
             query: Some("foo".to_string()),
-            after_date: Some("2020-01-01".to_string()),
-            before_date: Some("2021-01-01".to_string()),
+            priority_after: Some("2020-01-01".to_string()),
+            priority_before: Some("2021-01-01".to_string()),
             ..Default::default()
         };
         let url = options.to_url().unwrap();
         assert!(url.contains("q=foo"));
-        assert!(url.contains("after=2020-01-01"));
-        assert!(url.contains("before=2021-01-01"));
+        // Date is converted from YYYY-MM-DD to YYYYMMDD format
+        assert!(url.contains("after=priority%3A20200101"));
+        assert!(url.contains("before=priority%3A20210101"));
 
         // Test error
         let options = SearchOptions::default();
