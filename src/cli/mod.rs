@@ -29,13 +29,32 @@ pub struct SearchArgs {
     #[arg(long)]
     pub country: Option<String>,
 
+    // Priority date filters
     /// Filter by priority date after (YYYY-MM-DD)
-    #[arg(short, long)]
-    pub after: Option<String>,
+    #[arg(long)]
+    pub priority_after: Option<String>,
 
     /// Filter by priority date before (YYYY-MM-DD)
-    #[arg(short, long)]
-    pub before: Option<String>,
+    #[arg(long)]
+    pub priority_before: Option<String>,
+
+    // Publication date filters
+    /// Filter by publication date after (YYYY-MM-DD)
+    #[arg(long)]
+    pub publication_after: Option<String>,
+
+    /// Filter by publication date before (YYYY-MM-DD)
+    #[arg(long)]
+    pub publication_before: Option<String>,
+
+    // Filing date filters
+    /// Filter by filing date after (YYYY-MM-DD)
+    #[arg(long)]
+    pub filing_after: Option<String>,
+
+    /// Filter by filing date before (YYYY-MM-DD)
+    #[arg(long)]
+    pub filing_before: Option<String>,
 
     /// Limit the number of results
     #[arg(short, long)]
@@ -89,6 +108,7 @@ pub struct FetchArgs {
 }
 
 #[derive(Subcommand)]
+#[allow(clippy::large_enum_variant)] // Commands enum contains SearchArgs which has many optional fields
 pub enum Commands {
     /// Search for patents
     Search {
@@ -152,8 +172,12 @@ pub async fn run_app(cli: Cli) -> Result<()> {
                 assignee: args.assignee,
                 country: args.country,
                 patent_number: None,
-                after_date: args.after,
-                before_date: args.before,
+                priority_after: args.priority_after,
+                priority_before: args.priority_before,
+                publication_after: args.publication_after,
+                publication_before: args.publication_before,
+                filing_after: args.filing_after,
+                filing_before: args.filing_before,
                 limit: args.limit,
                 language: args.language,
             };
@@ -179,8 +203,12 @@ pub async fn run_app(cli: Cli) -> Result<()> {
                 assignee: None,
                 country: None,
                 patent_number: Some(args.patent_id.clone()),
-                after_date: None,
-                before_date: None,
+                priority_after: None,
+                priority_before: None,
+                publication_after: None,
+                publication_before: None,
+                filing_after: None,
+                filing_before: None,
                 limit: None,
                 language: args.language,
             };

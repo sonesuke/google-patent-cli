@@ -35,11 +35,26 @@ pub struct SearchPatentsRequest {
     #[schemars(description = "Filter by country code (e.g., 'JP', 'US', 'CN')")]
     pub country: Option<String>,
 
-    #[schemars(description = "Filter by priority date after, format: YYYY-MM-DD")]
-    pub after: Option<String>,
+    // Priority date filters
+    #[schemars(description = "Filter by priority date after (YYYY-MM-DD)")]
+    pub priority_after: Option<String>,
 
-    #[schemars(description = "Filter by priority date before, format: YYYY-MM-DD")]
-    pub before: Option<String>,
+    #[schemars(description = "Filter by priority date before (YYYY-MM-DD)")]
+    pub priority_before: Option<String>,
+
+    // Publication date filters
+    #[schemars(description = "Filter by publication date after (YYYY-MM-DD)")]
+    pub publication_after: Option<String>,
+
+    #[schemars(description = "Filter by publication date before (YYYY-MM-DD)")]
+    pub publication_before: Option<String>,
+
+    // Filing date filters
+    #[schemars(description = "Filter by filing date after (YYYY-MM-DD)")]
+    pub filing_after: Option<String>,
+
+    #[schemars(description = "Filter by filing date before (YYYY-MM-DD)")]
+    pub filing_before: Option<String>,
 
     #[schemars(description = "Maximum number of results to return")]
     pub limit: Option<usize>,
@@ -53,8 +68,12 @@ impl Hash for SearchPatentsRequest {
         self.query.hash(state);
         self.assignee.hash(state);
         self.country.hash(state);
-        self.after.hash(state);
-        self.before.hash(state);
+        self.priority_after.hash(state);
+        self.priority_before.hash(state);
+        self.publication_after.hash(state);
+        self.publication_before.hash(state);
+        self.filing_after.hash(state);
+        self.filing_before.hash(state);
         self.limit.hash(state);
         self.language.hash(state);
     }
@@ -65,8 +84,12 @@ impl PartialEq for SearchPatentsRequest {
         self.query == other.query
             && self.assignee == other.assignee
             && self.country == other.country
-            && self.after == other.after
-            && self.before == other.before
+            && self.priority_after == other.priority_after
+            && self.priority_before == other.priority_before
+            && self.publication_after == other.publication_after
+            && self.publication_before == other.publication_before
+            && self.filing_after == other.filing_after
+            && self.filing_before == other.filing_before
             && self.limit == other.limit
             && self.language == other.language
     }
@@ -214,8 +237,12 @@ impl PatentHandler {
             assignee: request.assignee.clone(),
             country: request.country.clone(),
             patent_number: None,
-            after_date: request.after.clone(),
-            before_date: request.before.clone(),
+            priority_after: request.priority_after.clone(),
+            priority_before: request.priority_before.clone(),
+            publication_after: request.publication_after.clone(),
+            publication_before: request.publication_before.clone(),
+            filing_after: request.filing_after.clone(),
+            filing_before: request.filing_before.clone(),
             limit: request.limit,
             language: request.language.clone(),
         };
@@ -273,8 +300,12 @@ impl PatentHandler {
             assignee: None,
             country: None,
             patent_number: Some(request.patent_id.clone()),
-            after_date: None,
-            before_date: None,
+            priority_after: None,
+            priority_before: None,
+            publication_after: None,
+            publication_before: None,
+            filing_after: None,
+            filing_before: None,
             limit: None,
             language: request.language,
         };
@@ -465,8 +496,12 @@ mod tests {
             query: Some("test".to_string()),
             assignee: None,
             country: None,
-            after: None,
-            before: None,
+            priority_after: None,
+            priority_before: None,
+            publication_after: None,
+            publication_before: None,
+            filing_after: None,
+            filing_before: None,
             limit: None,
             language: None,
         };

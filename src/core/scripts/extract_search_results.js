@@ -172,13 +172,14 @@
             }
 
             let date = "Unknown";
-            const priorityMatch = datesText.match(/Priority\s+(\d{4}-\d{2}-\d{2})/);
-            if (priorityMatch) {
-                date = priorityMatch[1];
+            // Prefer Filed date over Priority date since most users care about filing date
+            const filedMatch = datesText.match(/Filed\s+(\d{4}-\d{2}-\d{2})/);
+            if (filedMatch) {
+                date = filedMatch[1];
             } else {
-                const filedMatch = datesText.match(/Filed\s+(\d{4}-\d{2}-\d{2})/);
-                if (filedMatch) {
-                    date = filedMatch[1];
+                const priorityMatch = datesText.match(/Priority\s+(\d{4}-\d{2}-\d{2})/);
+                if (priorityMatch) {
+                    date = priorityMatch[1];
                 }
             }
 

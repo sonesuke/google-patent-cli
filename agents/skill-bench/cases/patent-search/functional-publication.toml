@@ -1,0 +1,39 @@
+# Test Case: Patent Search - Publication Date Filter
+
+name = "publication-filter"
+description = "Verify patent-search skill works with publication date filter"
+timeout = 120
+
+test_prompt = """
+Search for patents about "ai" with publication date between 2023-01-01 and 2023-12-31, limit 5.
+"""
+
+[[checks]]
+name = "mcp_server_loaded"
+type = "script"
+command = "check-mcp-loaded.sh google-patent-cli"
+
+[[checks]]
+name = "skill_loaded"
+type = "script"
+command = "check-skill-loaded.sh patent-search"
+
+[[checks]]
+name = "patent_search_skill_invoked"
+type = "script"
+command = "check-skill-invoked.sh patent-search"
+
+[[checks]]
+name = "search_patents_mcp_called"
+type = "script"
+command = "check-mcp-success.sh search_patents"
+
+[[checks]]
+name = "publication_after_parameter_used"
+type = "script"
+command = "check-param.sh search_patents publication_after 2023-01-01"
+
+[[checks]]
+name = "publication_before_parameter_used"
+type = "script"
+command = "check-param.sh search_patents publication_before 2023-12-31"

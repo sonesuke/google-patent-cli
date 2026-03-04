@@ -38,6 +38,39 @@ execute_cypher({
 })
 ```
 
+### Date Filter Examples
+
+Search patents filed in 2023:
+
+```
+patent_search({
+  query: "artificial intelligence",
+  filing_after: "2023-01-01",
+  filing_before: "2023-12-31",
+  limit: 10
+})
+```
+
+Search patents with priority date in 2024:
+
+```
+patent_search({
+  assignee: ["Google LLC"],
+  priority_after: "2024-01-01",
+  priority_before: "2024-12-31"
+})
+```
+
+Search patents published in a specific date range:
+
+```
+patent_search({
+  query: "quantum computing",
+  publication_after: "2023-06-01",
+  publication_before: "2023-12-31"
+})
+```
+
 ## Parameters
 
 - `query` (string, optional): Free-text search query
