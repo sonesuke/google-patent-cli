@@ -5,7 +5,7 @@ description = "Verify patent-search skill works with basic query"
 timeout = 120
 
 test_prompt = """
-Search for patents about "machine learning" with limit 5.
+I want to search for patents about machine learning, show me 5 results.
 """
 
 [[checks]]
