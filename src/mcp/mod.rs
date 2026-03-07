@@ -216,8 +216,17 @@ impl PatentHandler {
     }
 
     /// Load JSON data into Cypher store and return graph schema
-    async fn load_to_cypher(&self, name: String, json: &Value) -> Option<String> {
-        let engine = CypherEngine::from_json_auto(json).ok()?;
+    async fn load_to_cypher(
+        &self,
+        name: String,
+        json: &Value,
+        root_label: Option<&str>,
+    ) -> Option<String> {
+        let engine = if let Some(label) = root_label {
+            CypherEngine::from_json_auto_as_root_with_label(json, label).ok()?
+        } else {
+            CypherEngine::from_json_auto(json).ok()?
+        };
         let graph_schema = engine.get_schema();
 
         // Store the engine
@@ -274,7 +283,7 @@ impl PatentHandler {
         // Auto-load into Cypher for querying
         let json_value: Value = serde_json::from_str(&json_str).unwrap_or_default();
         let dataset_name = Self::dataset_name_from_request(&request);
-        let graph_schema = self.load_to_cypher(dataset_name.clone(), &json_value).await;
+        let graph_schema = self.load_to_cypher(dataset_name.clone(), &json_value, None).await;
 
         // Evict old datasets if exceeding max cache size
         self.evict_old_datasets().await;
@@ -342,7 +351,8 @@ impl PatentHandler {
         // Auto-load into Cypher for querying
         let json_value: Value = serde_json::from_str(&json_str).unwrap_or_default();
         let dataset_name = Self::dataset_name_from_fetch(&request.patent_id);
-        let graph_schema = self.load_to_cypher(dataset_name.clone(), &json_value).await;
+        let graph_schema =
+            self.load_to_cypher(dataset_name.clone(), &json_value, Some("Patent")).await;
 
         // Evict old datasets if exceeding max cache size
         self.evict_old_datasets().await;

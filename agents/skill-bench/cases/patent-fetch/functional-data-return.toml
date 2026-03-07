@@ -1,0 +1,46 @@
+# Test Case: Patent Fetch - Data Return Integration
+
+name = "integration-data-return"
+description = "Verify patent-fetch skill returns data directly, not file paths"
+timeout = 120
+
+test_prompt = """
+Use the patent-fetch skill to fetch patent US9152718B2.
+
+Verify that the response includes:
+- The patent title
+- The abstract text
+- The assignee information
+
+The skill should return the actual patent data, not a file path that requires you to read a JSON file.
+"""
+
+[[checks]]
+name = "mcp_server_loaded"
+type = "script"
+command = "check-mcp-loaded.sh google-patent-cli"
+
+[[checks]]
+name = "skill_loaded"
+type = "script"
+command = "check-skill-loaded.sh patent-fetch"
+
+[[checks]]
+name = "patent_fetch_skill_invoked"
+type = "script"
+command = "check-skill-invoked.sh patent-fetch"
+
+[[checks]]
+name = "fetch_patent_mcp_called"
+type = "script"
+command = "check-mcp-success.sh fetch_patent"
+
+[[checks]]
+name = "title_returned"
+type = "script"
+command = "check-output-contains.sh 'Serving advertisements'"
+
+[[checks]]
+name = "no_json_file_path_in_output"
+type = "script"
+command = "check-output-not-contains.sh 'patent-.*\\.json'"
