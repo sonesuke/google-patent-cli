@@ -225,11 +225,7 @@ fn parse_single_patent_result(
                 })
             })
             .collect();
-        if parsed.is_empty() {
-            None
-        } else {
-            Some(parsed)
-        }
+        if parsed.is_empty() { None } else { Some(parsed) }
     });
 
     // Parse claims
@@ -244,11 +240,7 @@ fn parse_single_patent_result(
                 })
             })
             .collect();
-        if parsed.is_empty() {
-            None
-        } else {
-            Some(parsed)
-        }
+        if parsed.is_empty() { None } else { Some(parsed) }
     });
 
     // Parse images
@@ -262,11 +254,7 @@ fn parse_single_patent_result(
                 })
             })
             .collect();
-        if parsed.is_empty() {
-            None
-        } else {
-            Some(parsed)
-        }
+        if parsed.is_empty() { None } else { Some(parsed) }
     });
 
     let filing_date = result["filing_date"].as_str().map(String::from);
@@ -302,10 +290,10 @@ fn parse_single_patent_result(
 fn parse_search_results(results: serde_json::Value, limit: Option<usize>) -> Result<SearchResult> {
     let mut sr: SearchResult = serde_json::from_value(results)?;
 
-    if let Some(limit) = limit {
-        if sr.patents.len() > limit {
-            sr.patents.truncate(limit);
-        }
+    if let Some(limit) = limit
+        && sr.patents.len() > limit
+    {
+        sr.patents.truncate(limit);
     }
 
     Ok(sr)
