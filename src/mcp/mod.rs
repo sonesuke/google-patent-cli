@@ -3,13 +3,14 @@ use crate::core::models::SearchOptions;
 use crate::core::models::{Patent, SearchResult};
 use crate::core::patent_search::{PatentSearch, PatentSearcher};
 use rmcp::{
+    ErrorData, RoleServer, ServerHandler, ServiceExt,
     handler::server::{tool::ToolRouter, wrapper::Parameters},
     model::{
         ErrorCode, Implementation, ProtocolVersion, ServerCapabilities, ServerInfo, ToolsCapability,
     },
-    schemars::{self, schema_for, JsonSchema},
+    schemars::{self, JsonSchema, schema_for},
     service::{NotificationContext, RequestContext},
-    tool, tool_handler, tool_router, ErrorData, RoleServer, ServerHandler, ServiceExt,
+    tool, tool_handler, tool_router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

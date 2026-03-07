@@ -281,10 +281,12 @@ mod tests {
         ])
         .expect("Cli parsing success in test");
 
-        std::env::set_var("HOME", temp_dir.path());
-        std::env::set_var("XDG_CONFIG_HOME", temp_dir.path());
-        std::env::set_var("APPDATA", temp_dir.path());
-        std::env::set_var("USERPROFILE", temp_dir.path());
+        unsafe {
+            std::env::set_var("HOME", temp_dir.path());
+            std::env::set_var("XDG_CONFIG_HOME", temp_dir.path());
+            std::env::set_var("APPDATA", temp_dir.path());
+            std::env::set_var("USERPROFILE", temp_dir.path());
+        }
 
         let res = run_app(cli).await;
         assert!(res.is_ok());
