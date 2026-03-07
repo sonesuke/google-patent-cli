@@ -23,11 +23,16 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: google-patent-cli
+
       - name: Check formatting
         run: cargo fmt -- --check
 
-      - name: Run clippy
-        run: cargo clippy -- -D warnings
+      - name: Build and lint
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Run tests
         run: cargo test
