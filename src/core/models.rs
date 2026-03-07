@@ -178,27 +178,27 @@ impl SearchOptions {
         let mut url_str = url.to_string();
 
         // Manually append assignee parameter if present
-        if let Some(assignees) = &self.assignee {
-            if !assignees.is_empty() {
-                let encoded_assignees: Vec<String> = assignees
-                    .iter()
-                    .map(|a| {
-                        // Encode each assignee value, including quotes, using form_urlencoded logic
-                        let quoted = format!("\"{}\"", a);
-                        url::form_urlencoded::byte_serialize(quoted.as_bytes()).collect::<String>()
-                    })
-                    .collect();
+        if let Some(assignees) = &self.assignee
+            && !assignees.is_empty()
+        {
+            let encoded_assignees: Vec<String> = assignees
+                .iter()
+                .map(|a| {
+                    // Encode each assignee value, including quotes, using form_urlencoded logic
+                    let quoted = format!("\"{}\"", a);
+                    url::form_urlencoded::byte_serialize(quoted.as_bytes()).collect::<String>()
+                })
+                .collect();
 
-                // Determine if we need to add '?' or '&'
-                let separator = if !url_str.contains('?') {
-                    "?"
-                } else if url_str.ends_with('?') {
-                    ""
-                } else {
-                    "&"
-                };
-                url_str.push_str(&format!("{}assignee={}", separator, encoded_assignees.join(",")));
-            }
+            // Determine if we need to add '?' or '&'
+            let separator = if !url_str.contains('?') {
+                "?"
+            } else if url_str.ends_with('?') {
+                ""
+            } else {
+                "&"
+            };
+            url_str.push_str(&format!("{}assignee={}", separator, encoded_assignees.join(",")));
         }
 
         // Manual check for empty params (after constructing)

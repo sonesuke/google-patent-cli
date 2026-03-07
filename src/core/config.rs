@@ -67,11 +67,11 @@ impl Config {
         }
 
         // Priority 2: CI environment
-        if env::var("CI").is_ok() || env::var("GITHUB_ACTIONS").is_ok() {
-            if let Some(path) = detect_chrome_path() {
-                // CI typically runs in containers/VMs, so add --no-sandbox
-                return (Some(path), vec!["--no-sandbox".to_string()]);
-            }
+        if (env::var("CI").is_ok() || env::var("GITHUB_ACTIONS").is_ok())
+            && let Some(path) = detect_chrome_path()
+        {
+            // CI typically runs in containers/VMs, so add --no-sandbox
+            return (Some(path), vec!["--no-sandbox".to_string()]);
         }
 
         // Priority 3: Auto-detection
@@ -117,13 +117,12 @@ fn is_running_in_container() -> bool {
     }
 
     // Check /proc/1/cgroup for container indicators
-    if let Ok(content) = fs::read_to_string("/proc/1/cgroup") {
-        if content.contains("docker")
+    if let Ok(content) = fs::read_to_string("/proc/1/cgroup")
+        && (content.contains("docker")
             || content.contains("kubepods")
-            || content.contains("containerd")
-        {
-            return true;
-        }
+            || content.contains("containerd"))
+    {
+        return true;
     }
 
     false
