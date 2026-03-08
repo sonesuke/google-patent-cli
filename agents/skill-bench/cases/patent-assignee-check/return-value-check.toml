@@ -1,0 +1,44 @@
+# Test Case: Patent Assignee Check - Return Value Verification
+
+name = "return-value-check"
+description = "Verify patent-assignee-check returns dataset name and provides meaningful results"
+timeout = 120
+
+test_prompt = """
+Use the patent-assignee-check skill to find all assignee name variations for "Microsoft" in US patents. Show me the dataset name and the variations found.
+"""
+
+[[checks]]
+name = "mcp_server_loaded"
+type = "script"
+command = "check-mcp-loaded.sh google-patent-cli"
+
+[[checks]]
+name = "skill_loaded"
+type = "script"
+command = "check-skill-loaded.sh patent-assignee-check"
+
+[[checks]]
+name = "patent_assignee_check_skill_invoked"
+type = "script"
+command = "check-skill-invoked.sh patent-assignee-check"
+
+[[checks]]
+name = "search_patents_mcp_called"
+type = "script"
+command = "check-mcp-success.sh search_patents"
+
+[[checks]]
+name = "execute_cypher_invoked"
+type = "script"
+command = "check-mcp-invoked.sh execute_cypher"
+
+[[checks]]
+name = "dataset_name_in_output"
+type = "script"
+command = "check-output-contains.sh search-"
+
+[[checks]]
+name = "assignee_variations_in_output"
+type = "script"
+command = "check-output-contains.sh Microsoft"

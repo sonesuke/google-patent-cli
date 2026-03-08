@@ -17,20 +17,11 @@ if [[ ! -f "$LOG_FILE" ]]; then
   exit 2
 fi
 
-# Extract tool_use IDs for the specified MCP tool
-TOOL_USE_IDS=$(jq -r '
-  .[]
-  | select(.type? == "assistant")
-  | (.message.content? // [])
-  | select(type == "array")
-  | .[]
-  | select(type == "object" and .type? == "tool_use" and (.name? // "") | test("'"$MCP_TOOL_NAME"'"))
-  | .id
-' "$LOG_FILE")
+# Check if MCP tool was called using grep (more reliable than jq for mixed content)
+# Search for tool name in the log file
+TOOL_CALL_COUNT=$(grep -c "\"name.*${MCP_TOOL_NAME}\"" "$LOG_FILE" || echo 0)
 
-ID_COUNT=$(echo "$TOOL_USE_IDS" | grep -c '^\w*$' || true)
-
-if [[ $ID_COUNT -eq 0 ]]; then
+if [[ $TOOL_CALL_COUNT -eq 0 ]]; then
   if [[ "$OPTIONAL_FLAG" == "--optional" ]]; then
     exit 0
   else
@@ -39,24 +30,19 @@ if [[ $ID_COUNT -eq 0 ]]; then
   fi
 fi
 
-# Check if any tool_results have is_error: true
-while IFS= read -r tool_id; do
-  if [[ -n "$tool_id" ]]; then
-    ERROR_CHECK=$(jq -r "
-      .[]
-      | select(.type? == \"user\")
-      | (.message.content? // [])
-      | select(type == \"array\")
-      | .[]
-      | select(type == \"object\" and .type? == \"tool_result\" and .tool_use_id? == \"$tool_id\")
-      | .is_error // false
-    " "$LOG_FILE")
-
-    if [[ "$ERROR_CHECK" == "true" ]]; then
-      echo "MCP tool $MCP_TOOL_NAME (tool_use_id: $tool_id) returned an error" >&2
+# Check if any tool_results for the specified MCP tool have is_error: true
+# Extract tool_use_ids from error results and check if they belong to our tool
+while IFS= read -r error_line; do
+  # Extract tool_use_id from error result
+  TOOL_USE_ID=$(echo "$error_line" | grep -o '"tool_use_id":"[^"]*"' | cut -d'"' -f4)
+  if [[ -n "$TOOL_USE_ID" ]]; then
+    # Find the corresponding tool_use and check if it's our MCP tool
+    TOOL_USE=$(grep -o "\"id\":\"$TOOL_USE_ID\"[^}]*\"name\":\"[^\"]*${MCP_TOOL_NAME}[^\"]*\"" "$LOG_FILE")
+    if [[ -n "$TOOL_USE" ]]; then
+      echo "MCP tool $MCP_TOOL_NAME (tool_use_id: $TOOL_USE_ID) returned an error" >&2
       exit 1
     fi
   fi
-done <<< "$TOOL_USE_IDS"
+done < <(grep '"is_error":true' "$LOG_FILE")
 
 exit 0
