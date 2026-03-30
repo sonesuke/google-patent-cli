@@ -10,5 +10,4 @@ I want to verify the correct assignee name for "Toyota" in patent databases.
 
 [[checks]]
 name = "patent_assignee_check_skill_invoked"
-type = "script"
-command = "check-skill-invoked.sh patent-assignee-check"
+command = { command = "skill-invoked", skill = "patent-assignee-check" }

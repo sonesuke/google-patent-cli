@@ -10,25 +10,20 @@ Fetch patent details for US9152718B2.
 
 [[checks]]
 name = "mcp_server_loaded"
-type = "script"
-command = "check-mcp-loaded.sh google-patent-cli"
+command = { command = "mcp-loaded", server = "google-patent-cli" }
 
 [[checks]]
 name = "skill_loaded"
-type = "script"
-command = "check-skill-loaded.sh patent-fetch"
+command = { command = "skill-loaded", skill = "patent-fetch" }
 
 [[checks]]
 name = "patent_fetch_skill_invoked"
-type = "script"
-command = "check-skill-invoked.sh patent-fetch"
+command = { command = "skill-invoked", skill = "patent-fetch" }
 
 [[checks]]
 name = "fetch_patent_mcp_called"
-type = "script"
-command = "check-mcp-success.sh fetch_patent"
+command = { command = "mcp-success", tool = "fetch_patent" }
 
 [[checks]]
 name = "patent_id_parameter_used"
-type = "script"
-command = "check-param.sh fetch_patent patent_id US9152718B2"
+command = { command = "tool-use", tool = "fetch_patent", param = "patent_id", value = "US9152718B2" }

@@ -37,11 +37,6 @@ agents/
     tools/              # Agent tools
       load-progress.sh  # Read past context (JSONL)
       record-progress.sh # Write progress logs (JSONL)
-  skill-bench/          # Claude Code Skill testing framework
-    runner.sh           # Test runner
-    cases/              # Test case definitions (TOML, test prompts in English)
-    tools/              # Check scripts for validating test results
-    logs/               # Test execution logs
 claude-plugin/          # Claude Code Plugin structure
   skills/               # Individual skill definitions
 mise.toml               # Task definitions (fmt, clippy, test, pre-commit)
@@ -50,11 +45,13 @@ mise.toml               # Task definitions (fmt, clippy, test, pre-commit)
 
 ## Skill-Bench Testing
 
-`agents/skill-bench/` contains the testing framework for Claude Code skills:
+`tests/` contains skill test cases using the `skill-bench` CLI:
 
 - **Test cases are in English** - All `test_prompt` values in TOML files must be English
-- **Run tests**: `./agents/skill-bench/runner.sh` (executes inside container)
-- **Test pattern**: `./agents/skill-bench/runner.sh "cases/*/*.toml"`
+- **List tests**: `skill-bench list tests`
+- **Run tests**: `skill-bench run tests`
+- **Filter by skill**: `skill-bench run tests --skill patent-search`
+- **Log directory**: `skill-bench run tests --log logs/`
 
 ## Tools
 
