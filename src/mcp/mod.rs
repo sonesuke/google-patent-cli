@@ -125,6 +125,15 @@ pub struct SearchResultSummary {
 
     #[schemars(description = "Number of patents found")]
     pub count: usize,
+
+    #[schemars(description = "Total number of results from Google Patents")]
+    pub total_results: String,
+
+    #[schemars(description = "Top assignees with percentage breakdown")]
+    pub top_assignees: Option<Vec<crate::core::models::SummaryItem>>,
+
+    #[schemars(description = "Top CPC classifications with percentage breakdown")]
+    pub top_cpcs: Option<Vec<crate::core::models::SummaryItem>>,
 }
 
 /// Fetch result summary for returning to AI
@@ -295,6 +304,9 @@ impl PatentHandler {
             graph_schema,
             dataset: Some(dataset_name),
             count,
+            total_results: results.total_results.clone(),
+            top_assignees: results.top_assignees.clone(),
+            top_cpcs: results.top_cpcs.clone(),
         };
         Ok(serde_json::to_string_pretty(&summary).unwrap_or_default())
     }

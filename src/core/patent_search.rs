@@ -309,7 +309,7 @@ mod tests {
     fn test_parse_search_results_limit() {
         let results = json!({
             "total_results": "1000",
-            "patents": [
+            "Patent": [
             {
                 "id": "Unknown",
                 "title": "Anomaly detection based on ensemble machine learning model",

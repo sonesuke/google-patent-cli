@@ -1,6 +1,6 @@
 ---
 name: patent-search
-description: "Search and analyze patents from Google Patents with flexible filters including query, assignee, country, and date range. Use when the user wants to find, discover, or research patents by topic, company, technology, or assignee name."
+description: "Execute patent searches on Google Patents. Supports free-text queries, date range filters (filing, priority, publication), assignee filters, country filters, and result limits. Always use this skill for any patent search, find, or lookup request — even when specific parameters are provided."
 metadata:
   author: sonesuke
   version: 1.0.0

@@ -26,4 +26,4 @@ command = { command = "mcp-success", tool = "search_patents" }
 
 [[checks]]
 name = "country_parameter_used"
-command = { command = "tool-use", tool = "search_patents", param = "country", value = "JP" }
+command = { command = "tool-param", tool = "search_patents", param = "country", value = "JP" }
