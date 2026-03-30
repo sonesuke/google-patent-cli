@@ -26,4 +26,4 @@ command = { command = "mcp-success", tool = "fetch_patent" }
 
 [[checks]]
 name = "patent_id_parameter_used"
-command = { command = "tool-use", tool = "fetch_patent", param = "patent_id", value = "US9152718B2" }
+command = { command = "tool-param", tool = "fetch_patent", param = "patent_id", value = "US9152718B2" }

@@ -204,7 +204,7 @@
         total_results: totalResults,
         top_assignees: topAssignees,
         top_cpcs: topCpcs,
-        patents: patents
+        Patent: patents
     };
 })()
 

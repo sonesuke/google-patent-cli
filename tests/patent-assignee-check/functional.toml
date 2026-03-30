@@ -5,7 +5,7 @@ description = "Verify patent-assignee-check skill works for checking variations"
 timeout = 120
 
 test_prompt = """
-Find all spelling variations of Google assignee name in patent databases. Check how Google appears in patents.
+Find all spelling variations of Salesforce assignee name in patent databases. Check how Salesforce appears in patents.
 """
 
 [[checks]]
@@ -26,4 +26,4 @@ command = { command = "mcp-success", tool = "search_patents" }
 
 [[checks]]
 name = "company_name_parameter_used"
-command = { command = "tool-use", tool = "search_patents", param = "assignee", value = "Google" }
+command = { command = "tool-param", tool = "search_patents", param = "assignee", value = "Salesforce" }

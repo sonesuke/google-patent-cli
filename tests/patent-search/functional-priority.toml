@@ -26,8 +26,8 @@ command = { command = "mcp-success", tool = "search_patents" }
 
 [[checks]]
 name = "priority_after_parameter_used"
-command = { command = "tool-use", tool = "search_patents", param = "priority_after", value = "2023-01-01" }
+command = { command = "tool-param", tool = "search_patents", param = "priority_after", value = "2023-01-01" }
 
 [[checks]]
 name = "priority_before_parameter_used"
-command = { command = "tool-use", tool = "search_patents", param = "priority_before", value = "2023-12-31" }
+command = { command = "tool-param", tool = "search_patents", param = "priority_before", value = "2023-12-31" }
