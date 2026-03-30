@@ -10,30 +10,24 @@ Search for patents about "ai" with priority date between 2023-01-01 and 2023-12-
 
 [[checks]]
 name = "mcp_server_loaded"
-type = "script"
-command = "check-mcp-loaded.sh google-patent-cli"
+command = { command = "mcp-loaded", server = "google-patent-cli" }
 
 [[checks]]
 name = "skill_loaded"
-type = "script"
-command = "check-skill-loaded.sh patent-search"
+command = { command = "skill-loaded", skill = "patent-search" }
 
 [[checks]]
 name = "patent_search_skill_invoked"
-type = "script"
-command = "check-skill-invoked.sh patent-search"
+command = { command = "skill-invoked", skill = "patent-search" }
 
 [[checks]]
 name = "search_patents_mcp_called"
-type = "script"
-command = "check-mcp-success.sh search_patents"
+command = { command = "mcp-success", tool = "search_patents" }
 
 [[checks]]
 name = "priority_after_parameter_used"
-type = "script"
-command = "check-param.sh search_patents priority_after 2023-01-01"
+command = { command = "tool-param", tool = "search_patents", param = "priority_after", value = "2023-01-01" }
 
 [[checks]]
 name = "priority_before_parameter_used"
-type = "script"
-command = "check-param.sh search_patents priority_before 2023-12-31"
+command = { command = "tool-param", tool = "search_patents", param = "priority_before", value = "2023-12-31" }

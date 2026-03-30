@@ -1,0 +1,29 @@
+# Test Case: Patent Assignee Check - Basic
+
+name = "basic-check"
+description = "Verify patent-assignee-check skill works for checking variations"
+timeout = 120
+
+test_prompt = """
+Find all spelling variations of Salesforce assignee name in patent databases. Check how Salesforce appears in patents.
+"""
+
+[[checks]]
+name = "mcp_server_loaded"
+command = { command = "mcp-loaded", server = "google-patent-cli" }
+
+[[checks]]
+name = "skill_loaded"
+command = { command = "skill-loaded", skill = "patent-assignee-check" }
+
+[[checks]]
+name = "patent_assignee_check_skill_invoked"
+command = { command = "skill-invoked", skill = "patent-assignee-check" }
+
+[[checks]]
+name = "search_patents_mcp_called"
+command = { command = "mcp-success", tool = "search_patents" }
+
+[[checks]]
+name = "company_name_parameter_used"
+command = { command = "tool-param", tool = "search_patents", param = "assignee", value = "Salesforce" }

@@ -1,0 +1,29 @@
+# Test Case: Patent Assignee Check - With Country
+
+name = "check-with-country"
+description = "Verify patent-assignee-check skill works with country filter"
+timeout = 120
+
+test_prompt = """
+Find all spelling variations of Salesforce assignee name in US patents (country: US). Check how Salesforce appears in patent databases.
+"""
+
+[[checks]]
+name = "mcp_server_loaded"
+command = { command = "mcp-loaded", server = "google-patent-cli" }
+
+[[checks]]
+name = "skill_loaded"
+command = { command = "skill-loaded", skill = "patent-assignee-check" }
+
+[[checks]]
+name = "patent_assignee_check_skill_invoked"
+command = { command = "skill-invoked", skill = "patent-assignee-check" }
+
+[[checks]]
+name = "search_patents_mcp_called"
+command = { command = "mcp-success", tool = "search_patents" }
+
+[[checks]]
+name = "country_parameter_used"
+command = { command = "tool-param", tool = "search_patents", param = "country", value = "US" }
