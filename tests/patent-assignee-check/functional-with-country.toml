@@ -5,7 +5,7 @@ description = "Verify patent-assignee-check skill works with country filter"
 timeout = 120
 
 test_prompt = """
-Find all spelling variations of Salesforce assignee name in US patents (country: US). Check how Salesforce appears in patent databases.
+Find all spelling variations of Toyota assignee name in Japanese patents (country: JP). Check how Toyota appears in patent databases.
 """
 
 [[checks]]
@@ -26,4 +26,4 @@ command = { command = "mcp-success", tool = "search_patents" }
 
 [[checks]]
 name = "country_parameter_used"
-command = { command = "tool-param", tool = "search_patents", param = "country", value = "US" }
+command = { command = "tool-param", tool = "search_patents", param = "country", value = "JP" }
