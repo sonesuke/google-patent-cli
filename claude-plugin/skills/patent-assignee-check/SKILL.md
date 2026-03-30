@@ -38,6 +38,24 @@ execute_cypher({
 })
 ```
 
+**CRITICAL**: After searching, always use `execute_cypher` to retrieve results.
+Do NOT read the output JSON file directly. The JSON file is an internal
+artifact — all data is available through cypher queries.
+
+### Result Retrieval Patterns
+
+**Assignee name variations with counts**:
+
+```cypher
+MATCH (p:Patent) RETURN p.assignee, COUNT(*) AS count ORDER BY count DESC
+```
+
+**Assignee variations with sample titles**:
+
+```cypher
+MATCH (p:Patent) RETURN p.assignee, p.title, p.snippet LIMIT 20
+```
+
 ## Parameters
 
 - `company_name` (string, required): Company name to check for variations

@@ -38,6 +38,53 @@ execute_cypher({
 })
 ```
 
+**CRITICAL**: After searching, always use `execute_cypher` to retrieve results.
+Do NOT read the output JSON file directly. The JSON file is an internal
+artifact — all data is available through cypher queries.
+
+### Result Retrieval Patterns
+
+Use these cypher patterns to retrieve search results:
+
+**Total count**:
+
+```cypher
+MATCH (p:Patent) RETURN COUNT(*) AS count
+```
+
+**Top 20 snippets for noise analysis**:
+
+```cypher
+MATCH (p:Patent) RETURN p.id, p.title, p.snippet, p.assignee LIMIT 20
+```
+
+**Assignee breakdown**:
+
+```cypher
+MATCH (p:Patent) RETURN p.assignee, COUNT(*) AS count ORDER BY count DESC
+```
+
+**Date range summary**:
+
+```cypher
+MATCH (p:Patent) RETURN p.filing_date, p.title LIMIT 10
+```
+
+### Available Patent Node Fields
+
+| Field              | Description                     |
+| ------------------ | ------------------------------- |
+| `id`               | Patent ID (e.g., "US9152718B2") |
+| `title`            | Patent title                    |
+| `snippet`          | Search result snippet           |
+| `abstract_text`    | Full abstract                   |
+| `assignee`         | Assignee/applicant name         |
+| `filing_date`      | Filing date                     |
+| `publication_date` | Publication date                |
+| `url`              | Google Patents URL              |
+| `legal_status`     | Legal status                    |
+| `family_id`        | Patent family ID                |
+
 ### Date Filter Examples
 
 Search patents filed in 2023:
