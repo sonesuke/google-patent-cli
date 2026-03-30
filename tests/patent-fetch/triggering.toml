@@ -10,5 +10,4 @@ I need to get detailed information for patent US1234567B2.
 
 [[checks]]
 name = "patent_fetch_skill_invoked"
-type = "script"
-command = "check-skill-invoked.sh patent-fetch"
+command = { command = "skill-invoked", skill = "patent-fetch" }

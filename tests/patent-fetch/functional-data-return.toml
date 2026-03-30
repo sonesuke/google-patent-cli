@@ -17,30 +17,24 @@ The skill should return the actual patent data, not a file path that requires yo
 
 [[checks]]
 name = "mcp_server_loaded"
-type = "script"
-command = "check-mcp-loaded.sh google-patent-cli"
+command = { command = "mcp-loaded", server = "google-patent-cli" }
 
 [[checks]]
 name = "skill_loaded"
-type = "script"
-command = "check-skill-loaded.sh patent-fetch"
+command = { command = "skill-loaded", skill = "patent-fetch" }
 
 [[checks]]
 name = "patent_fetch_skill_invoked"
-type = "script"
-command = "check-skill-invoked.sh patent-fetch"
+command = { command = "skill-invoked", skill = "patent-fetch" }
 
 [[checks]]
 name = "fetch_patent_mcp_called"
-type = "script"
-command = "check-mcp-success.sh fetch_patent"
+command = { command = "mcp-success", tool = "fetch_patent" }
 
 [[checks]]
 name = "title_returned"
-type = "script"
-command = "check-output-contains.sh 'Serving advertisements'"
+command = { command = "message-contains", text = "Serving advertisements" }
 
 [[checks]]
 name = "no_json_file_path_in_output"
-type = "script"
-command = "check-output-not-contains.sh 'patent-.*\\.json'"
+command = { command = "message-contains", text = 'patent-.*\.json', deny = true }

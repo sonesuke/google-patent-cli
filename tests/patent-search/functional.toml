@@ -10,20 +10,16 @@ I want to search for patents about machine learning, show me 5 results.
 
 [[checks]]
 name = "mcp_server_loaded"
-type = "script"
-command = "check-mcp-loaded.sh google-patent-cli"
+command = { command = "mcp-loaded", server = "google-patent-cli" }
 
 [[checks]]
 name = "skill_loaded"
-type = "script"
-command = "check-skill-loaded.sh patent-search"
+command = { command = "skill-loaded", skill = "patent-search" }
 
 [[checks]]
 name = "patent_search_skill_invoked"
-type = "script"
-command = "check-skill-invoked.sh patent-search"
+command = { command = "skill-invoked", skill = "patent-search" }
 
 [[checks]]
 name = "search_patents_mcp_called"
-type = "script"
-command = "check-mcp-success.sh search_patents"
+command = { command = "mcp-success", tool = "search_patents" }

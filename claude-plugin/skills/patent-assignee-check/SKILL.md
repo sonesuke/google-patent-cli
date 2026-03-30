@@ -1,6 +1,6 @@
 ---
 name: patent-assignee-check
-description: "Discover all spelling variations and official assignee names for a company in patent databases. Use when verifying how a company name appears across patents (e.g., 'Google Inc.' vs 'Google LLC' vs 'Alphabet Inc.') to ensure comprehensive patent searches by capturing all name variations."
+description: "Discover all spelling variations and official assignee names for a company in patent databases. Always use this skill when the user asks to check, verify, or find assignee name variations (e.g., 'Google Inc.' vs 'Google LLC' vs 'Alphabet Inc.') to ensure comprehensive patent searches."
 metadata:
   author: sonesuke
   version: 1.0.0
@@ -34,8 +34,26 @@ patent_assignee_check({
 # Then query with execute_cypher to find variations:
 execute_cypher({
   dataset: "search-abc123",
-  query: "MATCH (p:Patent) RETURN p.assignee, count(*) ORDER BY count(*) DESC"
+  query: "MATCH (p:Patent) RETURN p.assignee, COUNT(*) AS count ORDER BY count DESC"
 })
+```
+
+**CRITICAL**: After searching, always use `execute_cypher` to retrieve results.
+Do NOT read the output JSON file directly. The JSON file is an internal
+artifact — all data is available through cypher queries.
+
+### Result Retrieval Patterns
+
+**Assignee name variations with counts**:
+
+```cypher
+MATCH (p:Patent) RETURN p.assignee, COUNT(*) AS count ORDER BY count DESC
+```
+
+**Assignee variations with sample titles**:
+
+```cypher
+MATCH (p:Patent) RETURN p.assignee, p.title, p.snippet LIMIT 20
 ```
 
 ## Parameters

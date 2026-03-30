@@ -22,7 +22,7 @@ pub struct PatentImage {
     pub figure_number: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SummaryItem {
     pub name: String,
     pub percentage: String,
@@ -35,6 +35,7 @@ pub struct SearchResult {
     pub top_assignees: Option<Vec<SummaryItem>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_cpcs: Option<Vec<SummaryItem>>,
+    #[serde(rename = "Patent")]
     pub patents: Vec<Patent>,
 }
 

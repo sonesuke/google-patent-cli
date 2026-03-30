@@ -9,6 +9,12 @@ run = "RUSTFLAGS=\"-D warnings\" cargo test --all-targets"
 
 [tasks.pre-commit]
 depends = ["fmt", "clippy", "test"]
+
+[tasks.skill-test]
+run = "skill-bench run tests --plugin-dir claude-plugin --log logs"
+
+[tasks.skill-test-list]
+run = "skill-bench list tests"
  
 [tasks.coverage]
 run = """
