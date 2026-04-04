@@ -41,6 +41,14 @@ EOF
     echo 'eval "$(mise activate bash)"' >> $HOME/.bashrc
     echo 'eval "$(mise activate zsh)"' >> $HOME/.zshrc
 
+    # Install skill-bench
+    if ! command -v skill-bench >/dev/null 2>&1; then
+        echo "[Devcontainer Setup] Installing skill-bench..."
+        curl -fsSL https://raw.githubusercontent.com/sonesuke/skill-bench/main/scripts/setup.sh | sh
+    else
+        echo "[Devcontainer Setup] skill-bench already installed: $(skill-bench --version 2>/dev/null || echo 'unknown')"
+    fi
+
     # Configure google-patent-cli to use chromium
     # Note: chrome_args will be dynamically determined by the app
     echo "[Devcontainer Setup] Configuring google-patent-cli..."

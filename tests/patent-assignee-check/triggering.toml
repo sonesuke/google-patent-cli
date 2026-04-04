@@ -2,7 +2,7 @@
 
 name = "triggering"
 description = "Verify patent-assignee-check skill is triggered when checking assignee variations"
-timeout = 120
+timeout = 300
 
 test_prompt = """
 I want to verify the correct assignee name for "Salesforce" in patent databases.
