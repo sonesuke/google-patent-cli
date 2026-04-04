@@ -1,0 +1,30 @@
+# Test Case: Patent Search - Empty Results
+
+name = "functional-empty"
+description = "Verify patent-search skill handles empty search results correctly"
+timeout = 120
+
+test_prompt = """
+Search for patents with query "xyz-nonexistent-patent-123" and limit 5.
+Then use execute_cypher to query the dataset.
+"""
+
+[[checks]]
+name = "mcp_server_loaded"
+command = { command = "mcp-loaded", server = "google-patent-cli" }
+
+[[checks]]
+name = "skill_loaded"
+command = { command = "skill-loaded", skill = "patent-search" }
+
+[[checks]]
+name = "patent_search_skill_invoked"
+command = { command = "skill-invoked", skill = "patent-search" }
+
+[[checks]]
+name = "search_patents_mcp_called"
+command = { command = "mcp-success", tool = "search_patents" }
+
+[[checks]]
+name = "execute_cypher_mcp_called"
+command = { command = "mcp-success", tool = "execute_cypher" }

@@ -11,7 +11,7 @@ run = "RUSTFLAGS=\"-D warnings\" cargo test --all-targets"
 depends = ["fmt", "clippy", "test"]
 
 [tasks.skill-test]
-run = "skill-bench run tests --plugin-dir claude-plugin --log logs"
+run = "cargo install --path . && skill-bench run tests --plugin-dir claude-plugin --log logs"
 
 [tasks.skill-test-list]
 run = "skill-bench list tests"

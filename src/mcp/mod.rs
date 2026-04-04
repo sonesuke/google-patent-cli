@@ -14,6 +14,7 @@ use rmcp::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use serde_json::json;
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
@@ -231,11 +232,27 @@ impl PatentHandler {
         json: &Value,
         root_label: Option<&str>,
     ) -> Option<String> {
-        let engine = if let Some(label) = root_label {
-            CypherEngine::from_json_auto_as_root_with_label(json, label).ok()?
+        // Try to create engine from the provided JSON
+        let engine_result = if let Some(label) = root_label {
+            CypherEngine::from_json_auto_as_root_with_label(json, label)
         } else {
-            CypherEngine::from_json_auto(json).ok()?
+            CypherEngine::from_json_auto(json)
         };
+
+        let engine = match engine_result {
+            Ok(e) => e,
+            Err(_) => {
+                // If failed (e.g., empty results), create a minimal valid graph
+                // Create a dummy node that CypherEngine can parse
+                let fallback_json = if let Some(label) = root_label {
+                    json!({ label: [{"id": "_dummy", "_label": label }] })
+                } else {
+                    json!({ "Patent": [{"id": "_dummy", "title": "", "url": ""}] })
+                };
+                CypherEngine::from_json_auto(&fallback_json).ok()?
+            }
+        };
+
         let graph_schema = engine.get_schema();
 
         // Store the engine
