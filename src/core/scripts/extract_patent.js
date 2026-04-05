@@ -267,6 +267,20 @@
         }
     }
 
+    // Method 4: Fallback - derive from patent ID kind code
+    if (!legalStatus) {
+        const patentId = new URL(window.location.href).pathname.split('/').pop();
+        const kindMatch = patentId.match(/([A-Z]\d*)$/);
+        if (kindMatch) {
+            const kc = kindMatch[1].toUpperCase();
+            if (kc.startsWith('A')) {
+                legalStatus = 'Pending';
+            } else if (kc.startsWith('B')) {
+                legalStatus = 'Active';
+            }
+        }
+    }
+
     return {
         title: title,
         abstract: abstract,
