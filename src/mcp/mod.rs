@@ -486,7 +486,7 @@ pub async fn run() -> anyhow::Result<()> {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::core::models::{Patent, SearchResult};
+    use crate::core::models::{Claim, Patent, SearchResult};
 
     struct MockSearcher;
 
@@ -600,5 +600,53 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.message.contains("Fetch failed"));
+    }
+
+    #[tokio::test]
+    async fn test_claims_via_cypher_relationship() {
+        let patent_with_claims = Patent {
+            id: "US123".to_string(),
+            title: "Test Patent".to_string(),
+            abstract_text: Some("Test abstract".to_string()),
+            claims: Some(vec![
+                Claim {
+                    number: "1".to_string(),
+                    id: "c1".to_string(),
+                    text: "A method for doing X.".to_string(),
+                },
+                Claim {
+                    number: "2".to_string(),
+                    id: "c2".to_string(),
+                    text: "The method of claim 1, further comprising Y.".to_string(),
+                },
+            ]),
+            ..Default::default()
+        };
+
+        let json_value = serde_json::to_value(&patent_with_claims).unwrap();
+        let engine = CypherEngine::from_json_with_label(&json_value, "Patent").unwrap();
+
+        // Verify claims are accessible via label directly
+        let result = engine.execute("MATCH (c:claims) RETURN c.text").unwrap();
+        let json = result.as_json_array();
+        let arr = json.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0]["c.text"], "A method for doing X.");
+        assert_eq!(arr[1]["c.text"], "The method of claim 1, further comprising Y.");
+
+        // Verify claims are accessible via relationship
+        let result = engine
+            .execute("MATCH (p:Patent)-[:claims]->(c:claims) RETURN c.number, c.text")
+            .unwrap();
+        let json = result.as_json_array();
+        let arr = json.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0]["c.text"], "A method for doing X.");
+
+        // Verify p.claims is null
+        let result = engine.execute("MATCH (p:Patent) RETURN p.claims").unwrap();
+        let json = result.as_json_array();
+        let arr = json.as_array().unwrap();
+        assert_eq!(arr[0]["p.claims"], "null");
     }
 }
