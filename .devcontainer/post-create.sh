@@ -88,6 +88,12 @@ EOF
 EOF
     fi
 
+    # Configure git to use gh for HTTPS auth
+    if command -v gh >/dev/null 2>&1; then
+        echo "[Devcontainer Setup] Configuring gh auth for git..."
+        gh auth setup-git
+    fi
+
     echo "[Devcontainer Setup] Complete!"
 else
     echo "Running in CI environment, skipping development setup..."
