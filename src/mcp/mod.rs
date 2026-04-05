@@ -234,7 +234,7 @@ impl PatentHandler {
     ) -> Option<String> {
         // Try to create engine from the provided JSON
         let engine_result = if let Some(label) = root_label {
-            CypherEngine::from_json_auto_as_root_with_label(json, label)
+            CypherEngine::from_json_with_label(json, label)
         } else {
             CypherEngine::from_json_auto(json)
         };
