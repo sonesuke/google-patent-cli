@@ -187,7 +187,7 @@ fn test_mcp_search_patents() {
 }
 
 #[test]
-fn test_mcp_fetch_patent() {
+fn test_mcp_claims_query_patterns() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_google-patent-cli"))
         .arg("mcp")
         .stdin(Stdio::piped())
@@ -211,37 +211,71 @@ fn test_mcp_fetch_patent() {
             "clientInfo": { "name": "test", "version": "1.0" }
         }
     });
-    writeln!(stdin, "{}", init_request).expect("Failed to write init");
+    writeln!(stdin, "{}", init_request).unwrap();
     let mut response = String::new();
-    reader.read_line(&mut response).expect("Failed to read init response");
+    reader.read_line(&mut response).unwrap();
 
     // 2. Initialized notification
-    let initialized_notification = json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized"
-    });
-    writeln!(stdin, "{}", initialized_notification).expect("Failed to write initialized");
+    let notif = json!({"jsonrpc": "2.0", "method": "notifications/initialized"});
+    writeln!(stdin, "{}", notif).unwrap();
 
-    // 3. Call fetch_patent
+    // 3. Fetch a patent
     let fetch_request = json!({
         "jsonrpc": "2.0",
         "id": 4,
         "method": "tools/call",
         "params": {
             "name": "fetch_patent",
+            "arguments": { "patent_id": "US9152718B2" }
+        }
+    });
+    writeln!(stdin, "{}", fetch_request).unwrap();
+    response.clear();
+    reader.read_line(&mut response).unwrap();
+    assert!(response.contains("output_file"), "Fetch failed: {}", response);
+
+    let fetch_result: serde_json::Value = serde_json::from_str(&response).unwrap();
+    let dataset = fetch_result["result"]["content"][0]["text"].as_str().unwrap();
+    let dataset_json: serde_json::Value = serde_json::from_str(dataset).unwrap();
+    let dataset_name = dataset_json["dataset"].as_str().unwrap().to_string();
+
+    // 4. Query claims via label - c.text should return claim body
+    let req = json!({
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "tools/call",
+        "params": {
+            "name": "execute_cypher",
             "arguments": {
-                "patent_id": "US9152718B2"
+                "dataset": dataset_name,
+                "query": "MATCH (c:claims) RETURN c.text LIMIT 1"
             }
         }
     });
-    writeln!(stdin, "{}", fetch_request).expect("Failed to write fetch call");
-
+    writeln!(stdin, "{}", req).unwrap();
     response.clear();
-    reader.read_line(&mut response).expect("Failed to read fetch response");
+    reader.read_line(&mut response).unwrap();
+    assert!(response.contains("c.text"), "c.text not in response: {}", response);
+    assert!(!response.contains("\"c.text\": \"null\""), "c.text is null");
 
-    // Now returns summary with output_file and schema
-    assert!(response.contains("output_file"), "Fetch response missing output_file: {}", response);
-    assert!(response.contains("schema"), "Fetch response missing schema: {}", response);
+    // 5. Query claims via relationship - should also work
+    let req = json!({
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "tools/call",
+        "params": {
+            "name": "execute_cypher",
+            "arguments": {
+                "dataset": dataset_name,
+                "query": "MATCH (p:Patent)-[:claims]->(c:claims) RETURN c.number, c.text LIMIT 1"
+            }
+        }
+    });
+    writeln!(stdin, "{}", req).unwrap();
+    response.clear();
+    reader.read_line(&mut response).unwrap();
+    assert!(response.contains("c.text"), "c.text not in relationship query: {}", response);
+    assert!(response.contains("c.number"), "c.number not in relationship query: {}", response);
 
     // Re-attach stdin for graceful_shutdown
     child.stdin = Some(stdin);

@@ -649,4 +649,23 @@ mod tests {
         let arr = json.as_array().unwrap();
         assert_eq!(arr[0]["p.claims"], "null");
     }
+
+    #[test]
+    fn test_parse_text_property() {
+        let engine = CypherEngine::from_json_with_label(
+            &serde_json::json!({"id": "1", "text": "hello"}),
+            "Test",
+        )
+        .unwrap();
+
+        // c.text should parse and execute correctly
+        let result = engine.execute("MATCH (c:Test) RETURN c.text");
+        assert!(result.is_ok(), "c.text parse/execute failed: {:?}", result.err());
+        let json = result.unwrap().as_json_array();
+        assert_eq!(json[0]["c.text"], "hello");
+
+        // c.id should also work
+        let result = engine.execute("MATCH (c:Test) RETURN c.id");
+        assert!(result.is_ok(), "c.id parse/execute failed: {:?}", result.err());
+    }
 }
