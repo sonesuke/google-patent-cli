@@ -19,13 +19,6 @@ if [ -z "$CI" ] && [ -z "$GITHUB_ACTIONS" ]; then
         echo "[Devcontainer Setup] Claude CLI already installed: $(claude --version)"
     fi
 
-    echo "[Devcontainer Setup] Configuring tmux..."
-    cat > $HOME/.tmux.conf << 'EOF'
-# Display pane number
-bind-key p display-panes
-set display-panes-time 10000
-EOF
-
     echo "[Devcontainer Setup] Configuring claude alias..."
     echo 'alias claude="claude --allow-dangerously-skip-permissions"' >> $HOME/.bashrc
     echo 'alias claude="claude --allow-dangerously-skip-permissions"' >> $HOME/.zshrc
@@ -53,8 +46,16 @@ EOF
     # Note: chrome_args will be dynamically determined by the app
     echo "[Devcontainer Setup] Configuring google-patent-cli..."
     mkdir -p "$HOME/.config/google-patent-cli"
-    cat > "$HOME/.config/google-patent-cli/config.toml" <<EOF
+    cat > ~/.config/google-patent-cli/config.toml << 'EOF'
+# Chrome browser path
 browser_path = "/usr/bin/chromium"
+
+# Chrome arguments for Docker/DevContainer environment
+chrome_args = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-gpu"
+]
 EOF
 
     # Run mise install
@@ -79,12 +80,18 @@ EOF
         "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
         "API_TIMEOUT_MS": "3000000",
         "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5",
-        "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-4.7",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.1",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5-turbo",
         "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.5-air"
     }
 }
 EOF
+    fi
+
+    # Configure git to use gh for HTTPS auth
+    if command -v gh >/dev/null 2>&1; then
+        echo "[Devcontainer Setup] Configuring gh auth for git..."
+        gh auth setup-git
     fi
 
     echo "[Devcontainer Setup] Complete!"

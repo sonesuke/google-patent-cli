@@ -14,8 +14,6 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     pkg-config \
     libssl-dev \
     ripgrep \
-    tmux \
-    vim \
     jq \
     sudo \
     chromium \
@@ -28,10 +26,6 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-# Install yq manually
-RUN curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq \
-    && chmod +x /usr/local/bin/yq
-
 # Ensure pre-installed tools are always in PATH even if CARGO_HOME is overridden at runtime
 ENV PATH=/usr/local/cargo/bin:$PATH
 
@@ -39,3 +33,9 @@ ENV PATH=/usr/local/cargo/bin:$PATH
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash \
     && rustup component add rustfmt clippy llvm-tools-preview \
     && cargo binstall -y cargo-audit cargo-llvm-cov
+
+# Install Chromium and dependencies for browser-based MCP
+RUN apt-get update && apt-get install -y \
+    chromium \
+    chromium-common \
+    && apt-get clean -y && rm -rf /var/lib/apt/lists/*
