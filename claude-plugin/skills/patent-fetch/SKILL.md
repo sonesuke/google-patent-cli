@@ -48,12 +48,31 @@ MATCH (p:Patent) RETURN p.title, p.abstract_text
 |--------------|------------------|
 | Assignee, owner, applicant | `p.assignee` |
 | Legal status, status, expired/active | `p.legal_status` |
-| Claims, what is claimed | `MATCH (p:Patent)-[:claims]->(c:claims) RETURN c.number, c.text` |
+| Claims, what is claimed | See claims section below |
 | Description, details, specification | `p.description` |
 | Filing date, application date | `p.filing_date` |
-| Publication date | `p.publication_date` |
+| Publication date, `p.publication_date` |
 | Priority date | `p.priority_date` |
-| Everything, full details | `p.title, p.abstract_text, p.description, p.assignee, p.filing_date, p.publication_date, p.priority_date, p.legal_status` (claims: use relationship query) |
+
+**Claims retrieval:**
+
+`p.claims` is always null. You MUST query `:claims` child nodes directly:
+
+```cypher
+MATCH (c:claims) RETURN c.number, c.text
+```
+
+**CRITICAL — Cypher Parser Limitations:**
+
+The Cypher parser has known bugs. Follow these rules strictly:
+
+1. **Do NOT use `ORDER BY`** — causes `c.text` to return `expression: null`
+2. **Do NOT use `WHERE` clauses** — `WHERE d.text CONTAINS '...'` and `WHERE c.number = '1'` cause parse errors
+3. **Do NOT use relationship patterns for property access** — `(p:Patent)-[:claims]->(c:claims) RETURN c.text` returns null
+4. **Do NOT use `p.claims`** — always null, claims are stored as child nodes
+5. **Do NOT use wrong labels** — `[:HAS_CHILD]->(c:claim)`, `[:claim]->(c:claim)`, `[:claims]->(c:claim)` return empty
+
+**Safe query pattern**: `MATCH (c:claims) RETURN c.number, c.text` (direct node match, no ORDER BY, no WHERE)
 
 **Example queries based on user request:**
 
@@ -67,10 +86,14 @@ User: "What's the legal status of US9152718B2?"
 → Include legal_status: `MATCH (p:Patent) RETURN p.title, p.legal_status`
 
 User: "Get full details for US9152718B2"
-→ Include everything: `MATCH (p:Patent) RETURN p.title, p.abstract_text, p.description, p.assignee, p.filing_date, p.publication_date, p.priority_date, p.legal_status`
-
-User: "What are the claims for US9152718B2?"
-→ Use relationship: `MATCH (p:Patent)-[:claims]->(c:claims) RETURN c.number, c.text ORDER BY c.number`
+→ Include everything:
+```cypher
+MATCH (p:Patent) RETURN p.title, p.abstract_text, p.description, p.assignee, p.filing_date, p.publication_date, p.legal_status
+```
+Then get claims separately:
+```cypher
+MATCH (c:claims) RETURN c.number, c.text
+```
 
 ## Important Notes
 
@@ -88,13 +111,9 @@ Patent data is loaded as a graph with the following structure:
   - `(:Patent)-[:description_paragraphs]->(:description_paragraphs)` - Description nodes
   - `(:Patent)-[:images]->(:images)` - Image nodes
 
-**Accessing claims via relationship:**
+**Accessing claims (direct node match — do NOT use relationship patterns or ORDER BY/WHERE):**
 ```cypher
-# Get all claim numbers and texts
-MATCH (p:Patent)-[:claims]->(c:claims) RETURN c.number, c.text
-
-# Get claims for a specific patent
-MATCH (p:Patent)-[:claims]->(c:claims) WHERE p.id = 'US9152718B2' RETURN c.number, c.text ORDER BY c.number
+MATCH (c:claims) RETURN c.number, c.text
 ```
 
 ## Parameters
