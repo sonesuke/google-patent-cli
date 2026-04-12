@@ -1,8 +1,4 @@
-pub mod cli;
-pub mod core;
-pub mod mcp;
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    cli::run().await
+    google_patent_cli::cli::run().await
 }

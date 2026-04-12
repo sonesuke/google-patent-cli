@@ -25,8 +25,6 @@ jobs:
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: google-patent-cli
 
       - name: Check formatting
         run: cargo fmt -- --check

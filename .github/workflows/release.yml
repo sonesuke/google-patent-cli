@@ -23,8 +23,6 @@ jobs:
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: google-patent-cli
 
       - name: Setup Chrome configuration
         run: |
@@ -116,8 +114,6 @@ jobs:
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: google-patent-cli
 
       - name: Install cross
         if: matrix.use_cross == true
