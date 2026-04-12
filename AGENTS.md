@@ -39,8 +39,9 @@ agents/
       record-progress.sh # Write progress logs (JSONL)
 claude-plugin/          # Claude Code Plugin structure
   skills/               # Individual skill definitions
+scripts/                # Build and setup scripts (build.sh, up.sh, setup.sh)
+flake.nix               # Nix flake for reproducible Docker image
 mise.toml               # Task definitions (fmt, clippy, test, pre-commit)
-.devcontainer/          # Dev container configuration
 ```
 
 ## Skill-Bench Testing
@@ -62,3 +63,13 @@ mise.toml               # Task definitions (fmt, clippy, test, pre-commit)
 | `mise run test` | Run tests with `cargo test` |
 | `mise run coverage` | Generate test coverage report |
 | `mise run pre-commit` | Run all of the above |
+
+## Development Container
+
+The dev environment uses a Nix flake-based Docker image managed via mise tasks.
+
+- **Build**: `mise run build` — Build the Docker image with Nix
+- **Start**: `mise run up` — Start the dev container
+- **Setup**: `mise run setup` — Configure git, Rust, Claude CLI, MCP tools, and skills inside the container
+- **Attach**: `mise run attach` — Open a shell inside the running container
+- **Stop**: `mise run down` — Stop and remove the container
