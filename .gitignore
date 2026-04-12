@@ -4,3 +4,6 @@ patent_page_dom.html
 .claude/worktrees/
 logs/
 .skill-bench/
+
+# Nix build artifacts
+result
