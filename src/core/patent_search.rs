@@ -174,7 +174,7 @@ impl PatentSearcher {
                 patents,
             })
         } else {
-            // Search results page - use navigate_safe to bypass webcomponents polyfill freeze
+            // Search results page - fetch via /xhr/query API
             let mut all_patents: Vec<Patent> = Vec::new();
             let limit = options.limit.unwrap_or(10);
             let mut total_results_str = "Unknown".to_string();
@@ -204,19 +204,7 @@ impl PatentSearcher {
                     eprintln!("URL: {}", page_url);
                 }
 
-                // Navigate with JS disabled to prevent webcomponents polyfill freeze,
-                // remove polyfill scripts, then re-enable JS for API fetch
-                let polyfill_selectors = [
-                    "script[src*='webcomponents']",
-                    "link[rel='import']",
-                    "script[src*='search-app']",
-                ];
-                page.navigate_safe(
-                    &page_url,
-                    &polyfill_selectors,
-                    std::time::Duration::from_secs(3),
-                )
-                .await?;
+                page.goto(&page_url).await?;
 
                 // Check for bot detection / rate limiting page
                 let title = page

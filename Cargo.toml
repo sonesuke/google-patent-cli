@@ -31,7 +31,7 @@ rmcp = { version = "0.16", features = ["server", "macros", "transport-io"] }
 async-trait = "0.1"
 thiserror = "2"
 schemars = "1.2"
-chrome-cdp = { git = "https://github.com/sonesuke/chrome-cdp", branch = "fix/wait-for-element-timeout" }
+chrome-cdp = { git = "https://github.com/sonesuke/chrome-cdp", branch = "main" }
 cypher-rs = { git = "https://github.com/sonesuke/cypher-rs" }
 
 [dependencies.openssl-sys]

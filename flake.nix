@@ -52,6 +52,10 @@
             pkg-config
             openssl.dev
             lcov
+            # Chromium runtime dependencies
+            fontconfig
+            dbus
+            liberation_ttf
             (rust-bin.stable.latest.minimal.override {
               extensions = [ "rustfmt-preview" "clippy-preview" ];
             })
@@ -81,6 +85,10 @@
               for f in ${pkgs.glibc}/lib/ld-linux*.so*; do
                 ln -sf "$f" ./lib/$(basename "$f")
               done
+              # Fontconfig setup for Chromium
+              mkdir -p ./etc/fonts
+              ln -sf ${pkgs.fontconfig.out}/etc/fonts/fonts.conf ./etc/fonts/fonts.conf
+              fc-cache -f 2>/dev/null || true
             '';
             config = {
               Env = [

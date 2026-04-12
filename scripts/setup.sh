@@ -13,20 +13,8 @@ else
   echo "Warning: GitHub CLI not authenticated, skipping git config"
 fi
 
-# Install Rust via rustup
-if ! command -v rustup >/dev/null 2>&1; then
-  echo "Installing Rust..."
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-tool stable --profile minimal
-  export PATH="$HOME/.cargo/bin:$PATH"
-  source "$HOME/.cargo/env"
-else
-  echo "Rust already installed: $(rustc --version)"
-fi
-
-# Add Rust components and tools
-echo "Setting up Rust toolchain..."
-rustup component add rustfmt clippy llvm-tools-preview
-curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+# Install cargo tools (Rust is pre-installed in the image)
+echo "Installing cargo tools..."
 cargo binstall -y cargo-audit cargo-llvm-cov
 
 # Install Claude CLI

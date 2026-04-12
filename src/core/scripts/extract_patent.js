@@ -18,7 +18,7 @@
     const descParas = Array.from(document.querySelectorAll('div.description-paragraph[num]')).map(el => ({
         number: el.getAttribute('num'),
         id: el.id,
-        text: el.innerText.trim()
+        text: (el.innerText.trim() || el.textContent.trim() || '')
     }));
 
     // Fallback for unstructured description (e.g., Japanese patents)
@@ -77,7 +77,7 @@
     const claimsArray = Array.from(document.querySelectorAll('div.claim[num]')).map(el => ({
         number: el.getAttribute('num'),
         id: el.id,
-        text: el.innerText.trim()
+        text: (el.innerText.trim() || el.textContent.trim() || '')
     }));
 
     // Extract images
