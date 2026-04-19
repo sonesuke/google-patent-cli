@@ -27,11 +27,15 @@ description = "Lint with cargo clippy"
 run = "cargo clippy --all-targets -- -D warnings"
 
 [tasks.test]
-description = "Run tests with cargo test"
-run = "RUSTFLAGS=\"-D warnings\" cargo test --all-targets"
+description = "Run unit tests"
+run = "RUSTFLAGS=\"-D warnings\" cargo test --lib --all"
+
+[tasks.test-e2e]
+description = "Run e2e tests"
+run = "cargo test --test e2e_cli --test e2e_mcp"
 
 [tasks.pre-commit]
-description = "Run all of the above"
+description = "Run fmt, clippy, and unit tests"
 depends = ["fmt", "clippy", "test"]
 
 [tasks.skill-test]
