@@ -25,6 +25,9 @@ jobs:
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: v0-rust
+          add-job-id-key: false
 
       - name: Check formatting
         run: cargo fmt -- --check
