@@ -134,11 +134,8 @@ impl PatentSearcher {
             if self.verbose {
                 eprintln!("Waiting for search results to load...");
             }
-            // Wait for search results to appear
-            let loaded = page.wait_for_element("search-result-item", 15).await?;
-            if !loaded {
-                return Err(Error::Search("No search results found within timeout".to_string()));
-            }
+            // Wait for search results to render
+            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
             if self.verbose {
                 eprintln!("Extracting search results from DOM...");
