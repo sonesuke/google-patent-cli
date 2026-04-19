@@ -3,74 +3,6 @@ use crate::core::{BrowserManager, CdpPage};
 use crate::core::{Error, Result};
 use async_trait::async_trait;
 
-// API response types for Google Patents /xhr/query endpoint
-#[derive(serde::Deserialize)]
-struct ApiResponse {
-    results: ApiResults,
-}
-
-#[derive(serde::Deserialize)]
-struct ApiResults {
-    total_num_results: u64,
-    cluster: Vec<ApiCluster>,
-}
-
-#[derive(serde::Deserialize)]
-struct ApiCluster {
-    result: Vec<ApiPatentEntry>,
-}
-
-#[derive(serde::Deserialize)]
-struct ApiPatentEntry {
-    patent: ApiPatent,
-}
-
-#[derive(serde::Deserialize)]
-struct ApiPatent {
-    title: Option<String>,
-    snippet: Option<String>,
-    filing_date: Option<String>,
-    assignee: Option<String>,
-    publication_number: Option<String>,
-}
-
-fn convert_api_response(api: ApiResponse) -> SearchResult {
-    let patents = api
-        .results
-        .cluster
-        .iter()
-        .flat_map(|cluster| cluster.result.iter())
-        .map(|entry| {
-            let p = &entry.patent;
-            let id = p.publication_number.clone().unwrap_or_default();
-            Patent {
-                id: id.clone(),
-                title: p.title.clone().unwrap_or_default(),
-                abstract_text: None,
-                description_paragraphs: None,
-                claims: None,
-                images: None,
-                snippet: p.snippet.clone(),
-                description: None,
-                filing_date: p.filing_date.clone(),
-                assignee: p.assignee.clone(),
-                related_application: None,
-                claiming_priority: None,
-                family_applications: None,
-                legal_status: None,
-                url: format!("https://patents.google.com/patent/{}", id),
-            }
-        })
-        .collect();
-
-    SearchResult {
-        total_results: api.results.total_num_results.to_string(),
-        top_assignees: None,
-        top_cpcs: None,
-        patents,
-    }
-}
-
 #[async_trait]
 pub trait PatentSearch: Send + Sync {
     async fn search(&self, options: &SearchOptions) -> Result<SearchResult>;
@@ -174,129 +106,59 @@ impl PatentSearcher {
                 patents,
             })
         } else {
-            // Search results page - fetch via /xhr/query API
-            let mut all_patents: Vec<Patent> = Vec::new();
+            // Search results page - scrape from DOM
             let limit = options.limit.unwrap_or(10);
-            let mut total_results_str = "Unknown".to_string();
-            let mut top_assignees: Option<Vec<crate::core::models::SummaryItem>> = None;
-            let mut top_cpcs: Option<Vec<crate::core::models::SummaryItem>> = None;
 
             if self.verbose {
                 eprintln!("Fetching search results (limit: {})...", limit);
             }
 
-            // Append num=100 to base_url to fetch more results per page if needed
-            let base_url = if limit > 10 { format!("{}&num=100", base_url) } else { base_url };
+            page.goto(&base_url).await?;
 
-            // Calculate pagination
-            let results_per_page = if limit > 10 { 100 } else { 10 };
-            let pages_needed = limit.div_ceil(results_per_page);
-
-            for page_num in 0..pages_needed {
-                let page_url = if page_num == 0 {
-                    base_url.clone()
-                } else {
-                    format!("{}&page={}", base_url, page_num)
-                };
-
-                if self.verbose {
-                    eprintln!("Loading page {} of {}...", page_num + 1, pages_needed);
-                    eprintln!("URL: {}", page_url);
-                }
-
-                page.goto(&page_url).await?;
-
-                // Check for bot detection / rate limiting page
-                let title = page
-                    .evaluate("document.title")
-                    .await
-                    .ok()
-                    .and_then(|v| v.as_str().map(String::from))
-                    .unwrap_or_default();
-                if title == "Sorry..." {
-                    let _ = page.close().await;
-                    return Err(Error::Search(
-                        "Google blocked this request (bot detection / rate limiting). \
-                         The IP address may be temporarily blocked. Try again later."
-                            .to_string(),
-                    ));
-                }
-
-                // Build API URL from the search URL
-                let api_path =
-                    base_url.strip_prefix("https://patents.google.com/").unwrap_or(&base_url);
-                let api_url = format!("/xhr/query?url={}", api_path);
-                let fetch_script = format!(
-                    r#"(async () => {{
-                        try {{
-                            const resp = await fetch("{}");
-                            if (!resp.ok) return {{ error: "HTTP " + resp.status }};
-                            return await resp.json();
-                        }} catch(e) {{
-                            return {{ error: e.message }};
-                        }}
-                    }})()"#,
-                    api_url
-                );
-
-                let api_result = page.evaluate(&fetch_script).await?;
-
-                if self.verbose {
-                    if let Some(err) = api_result.get("error") {
-                        eprintln!("API error: {}", err);
-                    } else {
-                        eprintln!("API response received");
-                    }
-                }
-
-                let sr = serde_json::from_value::<ApiResponse>(api_result)
-                    .map_err(|e| Error::Search(format!("Failed to parse API response: {}", e)))
-                    .map(convert_api_response)?;
-
-                if page_num == 0 {
-                    total_results_str = sr.total_results.clone();
-                    if self.verbose {
-                        eprintln!("Total results found: {}", total_results_str);
-                    }
-                    top_assignees = sr.top_assignees;
-                    top_cpcs = sr.top_cpcs;
-                }
-
-                let page_patents = sr.patents;
-
-                if self.verbose {
-                    eprintln!("Found {} patents on this page", page_patents.len());
-                }
-
-                if page_patents.is_empty() {
-                    break;
-                }
-
-                all_patents.extend(page_patents);
-
-                if all_patents.len() >= limit {
-                    break;
-                }
+            // Check for bot detection / rate limiting page
+            let title = page
+                .evaluate("document.title")
+                .await
+                .ok()
+                .and_then(|v| v.as_str().map(String::from))
+                .unwrap_or_default();
+            if title == "Sorry..." {
+                let _ = page.close().await;
+                return Err(Error::Search(
+                    "Google blocked this request (bot detection / rate limiting). \
+                     The IP address may be temporarily blocked. Try again later."
+                        .to_string(),
+                ));
             }
+
+            if self.verbose {
+                eprintln!("Waiting for search results to load...");
+            }
+            // Wait for search results to appear
+            let loaded = page.wait_for_element("search-result-item", 15).await?;
+            if !loaded {
+                return Err(Error::Search("No search results found within timeout".to_string()));
+            }
+
+            if self.verbose {
+                eprintln!("Extracting search results from DOM...");
+            }
+            let result = page.evaluate(include_str!("scripts/extract_search_results.js")).await?;
+            let mut sr: SearchResult = serde_json::from_value(result)
+                .map_err(|e| Error::Search(format!("Failed to parse search results: {}", e)))?;
+
             let _ = page.close().await;
 
             if self.verbose {
-                eprintln!("Total patents collected: {}", all_patents.len());
+                eprintln!("Total results found: {}", sr.total_results);
+                eprintln!("Patents on page: {}", sr.patents.len());
             }
 
-            if all_patents.len() > limit {
-                if self.verbose {
-                    eprintln!("Truncating to limit: {}", limit);
-                }
-                all_patents.truncate(limit);
+            if sr.patents.len() > limit {
+                sr.patents.truncate(limit);
             }
 
-            Ok(SearchResult {
-                total_results: total_results_str,
-                top_assignees,
-                top_cpcs,
-                patents: all_patents,
-            })
+            Ok(sr)
         }
     }
 }

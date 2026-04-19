@@ -126,10 +126,17 @@ impl SearchOptions {
                 q_parts.push(query.clone());
             }
 
-            // Assignee is handled manually later to support comma separation
-
             if !q_parts.is_empty() {
                 serializer.append_pair("q", &q_parts.join(" "));
+            }
+
+            // Add assignee as separate parameter (no quotes)
+            if let Some(assignees) = &self.assignee
+                && !assignees.is_empty()
+            {
+                for a in assignees {
+                    serializer.append_pair("assignee", a);
+                }
             }
 
             if let Some(country) = &self.country {
@@ -176,31 +183,7 @@ impl SearchOptions {
             }
         }
 
-        let mut url_str = url.to_string();
-
-        // Manually append assignee parameter if present
-        if let Some(assignees) = &self.assignee
-            && !assignees.is_empty()
-        {
-            let encoded_assignees: Vec<String> = assignees
-                .iter()
-                .map(|a| {
-                    // Encode each assignee value, including quotes, using form_urlencoded logic
-                    let quoted = format!("\"{}\"", a);
-                    url::form_urlencoded::byte_serialize(quoted.as_bytes()).collect::<String>()
-                })
-                .collect();
-
-            // Determine if we need to add '?' or '&'
-            let separator = if !url_str.contains('?') {
-                "?"
-            } else if url_str.ends_with('?') {
-                ""
-            } else {
-                "&"
-            };
-            url_str.push_str(&format!("{}assignee={}", separator, encoded_assignees.join(",")));
-        }
+        let url_str = url.to_string();
 
         // Manual check for empty params (after constructing)
         // Check if url string ends with / or /? and has no params
@@ -260,33 +243,26 @@ mod tests {
         // Test assignee only (single assignee)
         let options =
             SearchOptions { assignee: Some(vec!["Google LLC".to_string()]), ..Default::default() };
-        // assignee="Google LLC" -> encoded %22Google%20LLC%22
         let url = options.to_url().unwrap();
-
-        // Since no other params, it should start with ?assignee=
-        // form_urlencoded::byte_serialize uses + for spaces in query values
-        assert!(url.contains("?assignee=%22Google+LLC%22"));
+        assert_eq!(url, "https://patents.google.com/?assignee=Google+LLC");
 
         // Test assignee (multiple assignees)
         let options = SearchOptions {
             assignee: Some(vec!["Google LLC".to_string(), "Microsoft Corp".to_string()]),
             ..Default::default()
         };
-        // assignee="Google LLC","Microsoft Corp"
-        // Encoded individual values, joined by comma
         let url = options.to_url().unwrap();
-        assert!(url.contains("?assignee=%22Google+LLC%22,%22Microsoft+Corp%22"));
+        assert!(url.contains("assignee=Google+LLC"));
+        assert!(url.contains("assignee=Microsoft+Corp"));
 
-        // Test assignee (comma handling)
+        // Test assignee with comma in name
         let options = SearchOptions {
             assignee: Some(vec!["Salesforce.com, inc.".to_string()]),
             ..Default::default()
         };
         let url = options.to_url().unwrap();
-        // assignee="Salesforce.com, inc."
-        // comma inside quotes encoded as %2C. space as %20.
-        // %22Salesforce.com%2C%20inc.%22
-        assert!(url.contains("?assignee=%22Salesforce.com%2C+inc.%22"));
+        // comma encoded as %2C
+        assert!(url.contains("assignee=Salesforce.com%2C+inc."));
 
         // Test query with assignee
         let options = SearchOptions {
@@ -295,11 +271,9 @@ mod tests {
             country: None,
             ..Default::default()
         };
-        // q=foo&assignee="Google LLC"
-        // q is added via serializer (foo). assignee appended manually (&assignee=...)
         let url = options.to_url().unwrap();
         assert!(url.contains("q=foo"));
-        assert!(url.contains("&assignee=%22Google+LLC%22"));
+        assert!(url.contains("assignee=Google+LLC"));
 
         // Test query with country (JP should add language=JAPANESE)
         let options = SearchOptions {
