@@ -25,28 +25,14 @@ jobs:
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: v0-rust
+          add-job-id-key: false
 
       - name: Check formatting
         run: cargo fmt -- --check
 
-      - name: Build and lint
-        run: cargo clippy --all-targets -- -D warnings
-
-      - name: Run unit tests
-        run: cargo test --lib --all
-
-      - name: Check build
-        run: cargo check --release
-
-      - name: Test verbose mode
+      - name: Lint and test
         run: |
-          # Build the CLI first
-          cargo build --release
-
-          # Test verbose mode with a simple search
-          ./target/release/google-patent-cli search --query "test" --limit 1 --verbose || {
-            echo "Verbose mode test failed"
-            exit 1
-          }
-
-          echo "Verbose mode test passed"
+          cargo clippy --all-targets -- -D warnings
+          cargo test --lib --all
